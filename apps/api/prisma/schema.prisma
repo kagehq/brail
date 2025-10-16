@@ -136,9 +136,48 @@ model Domain {
   certStatus      String? // pending | issued | failed
 
   // Relations
-  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  site         Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  certificates SslCertificate[]
 
   @@index([siteId])
+}
+
+model SslCertificate {
+  id          String   @id @default(cuid())
+  domainId    String
+  hostname    String   // Convenience field for queries
+  
+  // Certificate data (encrypted)
+  certPem     String   @db.Text // Full certificate chain
+  keyPem      String   @db.Text // Private key (encrypted)
+  
+  // ACME metadata
+  accountKey  String?  @db.Text // ACME account private key (encrypted)
+  orderUrl    String?  // ACME order URL for status checking
+  
+  // Certificate info
+  issuer      String?  // Certificate issuer (e.g., "Let's Encrypt")
+  issuedAt    DateTime
+  expiresAt   DateTime
+  
+  // Status
+  status      String   @default("pending") // pending, active, expiring, expired, failed
+  lastError   String?  @db.Text
+  
+  // Auto-renewal
+  autoRenew   Boolean  @default(true)
+  renewedFrom String?  // ID of previous certificate if this is a renewal
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  domain Domain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  
+  @@index([domainId])
+  @@index([hostname])
+  @@index([expiresAt])
+  @@index([status])
 }
 
 // ============================================================================

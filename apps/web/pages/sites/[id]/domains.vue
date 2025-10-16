@@ -53,7 +53,7 @@
           <div class="flex items-start justify-between">
             <div class="flex-1">
               <!-- Domain Name & Status -->
-              <div class="flex items-center gap-3 mb-4">
+              <div class="flex items-center gap-3 mb-4 flex-wrap">
                 <h3 class="text-xl font-semibold text-white">{{ domain.hostname }}</h3>
                 <span
                   :class="[
@@ -68,6 +68,23 @@
                   ]"
                 >
                   {{ domain.status }}
+                </span>
+                <!-- SSL Status Badge -->
+                <span
+                  v-if="domain.certStatus"
+                  :class="[
+                    'px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5',
+                    domain.certStatus === 'issued' 
+                      ? 'bg-green-300/10 border border-green-300/20 text-green-300'
+                      : domain.certStatus === 'pending'
+                      ? 'bg-yellow-300/10 border border-yellow-300/20 text-yellow-300'
+                      : 'bg-red-500/10 border border-red-500/20 text-red-400'
+                  ]"
+                >
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  SSL: {{ domain.certStatus }}
                 </span>
               </div>
 
@@ -123,6 +140,18 @@
                 class="px-4 py-2 bg-blue-300 text-black rounded-lg hover:bg-blue-400 transition font-medium text-sm disabled:opacity-50"
               >
                 {{ verifying === domain.id ? 'Verifying...' : 'Verify DNS' }}
+              </button>
+
+              <button
+                v-if="(domain.status === 'verified' || domain.status === 'active') && !domain.certStatus"
+                @click="provisionSSL(domain.id)"
+                :disabled="provisioning === domain.id"
+                class="px-4 py-2 bg-green-300 text-black rounded-lg hover:bg-green-400 transition font-medium text-sm disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                {{ provisioning === domain.id ? 'Getting SSL...' : 'Enable SSL' }}
               </button>
 
               <button
@@ -210,6 +239,7 @@ const showAddModal = ref(false);
 const newHostname = ref('');
 const adding = ref(false);
 const verifying = ref<string | null>(null);
+const provisioning = ref<string | null>(null);
 
 const confirmModal = ref({
   show: false,
@@ -293,6 +323,44 @@ async function verifyDomain(domainId: string) {
     toast.error('Verification Failed', error.message);
   } finally {
     verifying.value = null;
+  }
+}
+
+async function provisionSSL(domainId: string) {
+  provisioning.value = domainId;
+
+  try {
+    const response = await fetch(`${config.public.apiUrl}/v1/domains/${domainId}/ssl/provision`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to provision SSL');
+    }
+
+    toast.success('SSL Provisioning Started', 'Your certificate will be ready in a few minutes. This page will update automatically.');
+    
+    // Poll for updates
+    setTimeout(async () => {
+      await loadDomains();
+      
+      // If still pending, poll again
+      const domain = domains.value.find(d => d.id === domainId);
+      if (domain && domain.certStatus === 'pending') {
+        toast.info('SSL Still Provisioning', 'This usually takes 2-5 minutes...');
+      } else if (domain && domain.certStatus === 'issued') {
+        toast.success('SSL Certificate Active!', 'Your domain is now secured with HTTPS 🔒');
+      } else if (domain && domain.certStatus === 'failed') {
+        toast.error('SSL Provisioning Failed', 'Please try again or contact support if the issue persists.');
+      }
+    }, 30000); // Check after 30 seconds
+
+  } catch (error: any) {
+    toast.error('SSL Provisioning Failed', error.message);
+  } finally {
+    provisioning.value = null;
   }
 }
 

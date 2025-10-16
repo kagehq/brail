@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
 import { StorageModule } from './storage/storage.module';
 import { AuthModule } from './auth/auth.module';
@@ -18,9 +19,11 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AuditModule } from './audit/audit.module';
 import { BuildModule } from './build/build.module';
 import { BuildLogsModule } from './build-logs/build-logs.module';
+import { SslModule } from './ssl/ssl.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     PrismaModule,
     StorageModule,
     AdaptersModule,
@@ -39,6 +42,7 @@ import { BuildLogsModule } from './build-logs/build-logs.module';
     AuditModule,
     BuildModule,
     BuildLogsModule,
+    SslModule,
     PublicModule,
   ],
 })
