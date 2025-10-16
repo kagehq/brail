@@ -1,0 +1,39 @@
+{
+  "name": "@br/shared",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./src/audit.js": {
+      "import": "./dist/audit.js",
+      "require": "./dist/audit.cjs",
+      "types": "./dist/audit.d.ts"
+    },
+    "./src/crypto.js": {
+      "import": "./dist/crypto.js",
+      "require": "./dist/crypto.cjs",
+      "types": "./dist/crypto.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "npm run build:esm && npm run build:cjs",
+    "build:esm": "tsc",
+    "build:cjs": "tsc --module commonjs --outDir dist-cjs && node scripts/fix-cjs.cjs && rm -rf dist-cjs",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist dist-cjs"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}
+

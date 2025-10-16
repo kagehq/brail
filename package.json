@@ -1,0 +1,25 @@
+{
+  "name": "brail",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Brail - Instant Static Deploys Platform",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:migrate": "cd apps/api && pnpm prisma migrate dev",
+    "db:studio": "cd apps/api && pnpm prisma studio",
+    "db:generate": "cd apps/api && pnpm prisma generate"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
+

@@ -1,0 +1,39 @@
+{
+  "name": "@br/adapters",
+  "version": "0.1.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@br/shared": "workspace:*",
+    "@aws-sdk/client-s3": "^3.490.0",
+    "ssh2": "^1.15.0",
+    "glob": "^10.3.10",
+    "form-data": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/ssh2": "^1.15.0",
+    "@types/form-data": "^2.5.0",
+    "typescript": "^5.3.3"
+  },
+  "peerDependencies": {
+    "basic-ftp": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "basic-ftp": {
+      "optional": true
+    }
+  }
+}
+

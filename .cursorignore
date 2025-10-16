@@ -1,0 +1,10 @@
+node_modules
+dist
+.next
+.nuxt
+.output
+build
+coverage
+.turbo
+.cache
+

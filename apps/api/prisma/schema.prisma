@@ -1,0 +1,293 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URL")
+}
+
+// ============================================================================
+// User & Organization
+// ============================================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  // Relations
+  orgMembers OrgMember[]
+  tokens     Token[]
+}
+
+model Org {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  // Relations
+  members OrgMember[]
+  sites   Site[]
+}
+
+model OrgMember {
+  id     String @id @default(cuid())
+  userId String
+  orgId  String
+  role   String @default("member") // owner, admin, member
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+  @@index([userId])
+  @@index([orgId])
+}
+
+// ============================================================================
+// Site & Deploys
+// ============================================================================
+
+model Site {
+  id             String   @id @default(cuid())
+  orgId          String
+  name           String
+  activeDeployId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  org                Org                 @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  deploys            Deploy[]
+  domains            Domain[]
+  connectionProfiles ConnectionProfile[]
+  releases           Release[]
+  buildLogs          BuildLog[]
+
+  @@index([orgId])
+}
+
+model Deploy {
+  id            String   @id @default(cuid())
+  siteId        String
+  status        String   @default("uploading") // uploading, uploaded, active, failed
+  fileCount     Int      @default(0)
+  byteSize      BigInt   @default(0)
+  isPatch       Boolean  @default(false)
+  baseDeployId  String? // for patch deploys: the deploy being patched
+  comment       String?  @db.Text // optional deployment notes/comment
+  deployedBy    String? // userId who triggered deployment
+  deployedByEmail String? // email of user who triggered deployment
+  duration      Int? // deployment duration in milliseconds
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  site         Site            @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  releases     Release[]
+  logs         DeploymentLog[]
+  buildLogs    BuildLog[]
+  patchesFrom  Patch[]         @relation("PatchBase")
+  patchesTo    Patch[]         @relation("PatchNew")
+
+  @@index([siteId])
+  @@index([createdAt])
+}
+
+model Patch {
+  id           String   @id @default(cuid())
+  siteId       String
+  baseDeployId String
+  newDeployId  String
+  summary      Json // {added:[], replaced:[], deleted:[]}
+  createdAt    DateTime @default(now())
+
+  // Relations
+  baseDeploy Deploy @relation("PatchBase", fields: [baseDeployId], references: [id], onDelete: Cascade)
+  newDeploy  Deploy @relation("PatchNew", fields: [newDeployId], references: [id], onDelete: Cascade)
+
+  @@index([siteId])
+  @@index([newDeployId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// Domains
+// ============================================================================
+
+model Domain {
+  id        String   @id @default(cuid())
+  siteId    String
+  hostname  String   @unique
+  status    String   @default("pending") // pending, verified, securing, active, failed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // CNAME verification
+  cnameTarget     String
+  lastCheckedAt   DateTime?
+  
+  // SSL
+  certProvider    String? // 'acme' | 'external' (future)
+  certStatus      String? // pending | issued | failed
+
+  // Relations
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId])
+}
+
+// ============================================================================
+// Personal Access Tokens
+// ============================================================================
+
+model Token {
+  id        String    @id @default(cuid())
+  userId    String
+  siteId    String?
+  name      String
+  hash      String    @unique // bcrypt hash of token
+  scopes    String[] // e.g., ["deploy:write", "site:read"]
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([hash])
+}
+
+// ============================================================================
+// Connection Profiles & Releases (Phase 1)
+// ============================================================================
+
+model ConnectionProfile {
+  id        String   @id @default(cuid())
+  siteId    String
+  name      String
+  adapter   String // ssh-rsync, s3, etc.
+  configEnc Json // encrypted adapter-specific config
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, name])
+  @@index([siteId])
+}
+
+model Release {
+  id                    String   @id @default(cuid())
+  siteId                String
+  deployId              String
+  adapter               String
+  destinationRef        String? // adapter-specific reference (e.g., remote path or S3 URI)
+  status                String   @default("staged") // staged, active, failed
+  target                String   @default("preview") // preview, production
+  platformDeploymentId  String? // platform-specific deployment ID (Vercel, CF Pages, etc.)
+  previewUrl            String? // preview URL from platform
+  errorMessage          String?  @db.Text // error message if failed
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  deploy Deploy @relation(fields: [deployId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, deployId, adapter])
+  @@index([siteId])
+  @@index([deployId])
+  @@index([createdAt])
+}
+
+model DeploymentLog {
+  id        String   @id @default(cuid())
+  deployId  String
+  level     String   // info, error, debug, warn
+  message   String   @db.Text
+  metadata  String?  @db.Text // JSON string for additional data
+  timestamp DateTime @default(now())
+
+  // Relations
+  deploy Deploy @relation(fields: [deployId], references: [id], onDelete: Cascade)
+
+  @@index([deployId])
+  @@index([timestamp])
+}
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  orgId     String
+  siteId    String
+  deployId  String?
+  userId    String?
+  userEmail String?  // user's email for display purposes
+  action    String   // e.g. "deploy.created","deploy.finalized","deploy.activated","rollback","login"
+  ipHash    String?  // anonymized
+  userAgent String?
+  country   String?  // ISO-2
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([siteId, createdAt])
+  @@index([deployId])
+}
+
+// ============================================================================
+// Build Cache
+// ============================================================================
+
+model BuildCache {
+  id           String   @id @default(cuid())
+  orgId        String
+  siteId       String
+  lockHash     String // sha256 of package-lock/pnpm-lock/yarn.lock
+  framework    String
+  nodeVersion  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  meta         Json?
+
+  @@index([siteId, lockHash])
+}
+
+// ============================================================================
+// Build Logs
+// ============================================================================
+
+model BuildLog {
+  id            String   @id @default(cuid())
+  siteId        String
+  deployId      String?  // Optional - CLI builds may not have deployId yet
+  framework     String   // next, astro, vite, etc.
+  command       String   // The build command that was run
+  status        String   @default("running") // running, success, failed, cancelled
+  exitCode      Int?     // Exit code of build process
+  stdout        String   @db.Text // Build output (stdout)
+  stderr        String?  @db.Text // Error output (stderr)
+  duration      Int?     // Duration in milliseconds
+  warnings      Json?    // Array of validation warnings
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+  
+  // Build metadata
+  nodeVersion   String?
+  packageManager String? // npm, pnpm, yarn
+  cacheHit      Boolean  @default(false)
+  outputDir     String?  // Where the build output is located
+  
+  // Relations
+  site   Site    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  deploy Deploy? @relation(fields: [deployId], references: [id], onDelete: Cascade)
+  
+  @@index([siteId, startedAt])
+  @@index([deployId])
+  @@index([status])
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@br/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "clean": "rm -rf .nuxt .output dist"
+  },
+  "dependencies": {
+    "@br/shared": "workspace:*",
+    "canvas-confetti": "^1.9.3",
+    "jszip": "^3.10.1",
+    "nuxt": "^3.9.0",
+    "shiki": "^3.13.0",
+    "socket.io-client": "^4.8.1",
+    "tus-js-client": "^3.1.1",
+    "vue": "^3.4.0",
+    "vue-router": "^4.2.5",
+    "vue-sonner": "^2.0.9",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@nuxtjs/tailwindcss": "^6.11.0",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}

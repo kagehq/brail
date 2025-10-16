@@ -1,0 +1,28 @@
+{
+  "name": "create-br-adapter",
+  "version": "0.1.0",
+  "description": "Scaffold a new Brail deployment adapter",
+  "type": "module",
+  "bin": {
+    "create-br-adapter": "./bin/create-br-adapter.js"
+  },
+  "scripts": {
+    "build": "echo 'No build needed for scaffolder'"
+  },
+  "keywords": [
+    "brail",
+    "adapter",
+    "scaffold",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "prompts": "^2.4.2",
+    "chalk": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/prompts": "^2.4.9"
+  }
+}
+

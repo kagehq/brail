@@ -1,0 +1,144 @@
+import { Injectable } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
+
+  /**
+   * Generate magic link token
+   */
+  async generateMagicToken(email: string): Promise<string> {
+    return this.jwtService.sign(
+      { email, type: 'magic' },
+      { expiresIn: '15m' },
+    );
+  }
+
+  /**
+   * Verify magic token and get/create user
+   */
+  async verifyMagicToken(token: string) {
+    const payload = this.jwtService.verify(token);
+
+    if (payload.type !== 'magic') {
+      throw new Error('Invalid token type');
+    }
+
+    // Get or create user
+    let user = await this.prisma.user.findUnique({
+      where: { email: payload.email },
+    });
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email: payload.email,
+        },
+      });
+
+      // Create default org for user
+      const org = await this.prisma.org.create({
+        data: {
+          name: `${payload.email}'s Org`,
+        },
+      });
+
+      // Add user to org as owner
+      await this.prisma.orgMember.create({
+        data: {
+          userId: user.id,
+          orgId: org.id,
+          role: 'owner',
+        },
+      });
+    }
+
+    return user;
+  }
+
+  /**
+   * Generate session token
+   */
+  async generateSessionToken(userId: string): Promise<string> {
+    return this.jwtService.sign({ userId, type: 'session' });
+  }
+
+  /**
+   * Verify session token
+   */
+  async verifySessionToken(token: string): Promise<string> {
+    const payload = this.jwtService.verify(token);
+
+    if (payload.type !== 'session') {
+      throw new Error('Invalid token type');
+    }
+
+    return payload.userId;
+  }
+
+  /**
+   * Get user by ID
+   */
+  async getUserById(userId: string) {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  /**
+   * Verify Personal Access Token
+   */
+  async verifyPAT(token: string): Promise<{ userId: string; siteId?: string }> {
+    const tokenRecord = await this.prisma.token.findUnique({
+      where: { hash: await this.hashToken(token) },
+      include: { user: true },
+    });
+
+    if (!tokenRecord) {
+      throw new Error('Invalid token');
+    }
+
+    // Check expiration
+    if (tokenRecord.expiresAt && tokenRecord.expiresAt < new Date()) {
+      throw new Error('Token expired');
+    }
+
+    return {
+      userId: tokenRecord.userId,
+      siteId: tokenRecord.siteId || undefined,
+    };
+  }
+
+  /**
+   * Hash token for storage
+   */
+  async hashToken(token: string): Promise<string> {
+    return bcrypt.hash(token, 10);
+  }
+
+  /**
+   * Generate random token
+   */
+  generateToken(): string {
+    // Generate a random token (64 characters)
+    const chars =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let token = 'br_';
+    for (let i = 0; i < 64; i++) {
+      token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return token;
+  }
+}
+
