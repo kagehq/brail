@@ -1,6 +1,6 @@
 {
   "name": "@brailhq/adapter-kit",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Public SDK for building Brail deployment adapters",
   "type": "module",
   "main": "./dist/index.js",
