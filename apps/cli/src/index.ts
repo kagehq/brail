@@ -29,6 +29,7 @@ import {
   domainVerifyCommand,
   domainRemoveCommand,
 } from './commands/domain.js';
+import { envCommand } from './commands/env.js';
 
 const program = new Command();
 
@@ -264,5 +265,8 @@ domain
   .description('Remove a domain')
   .option('-s, --site <siteId>', 'Site ID')
   .action(domainRemoveCommand);
+
+// Env commands
+program.addCommand(envCommand);
 
 program.parse();
