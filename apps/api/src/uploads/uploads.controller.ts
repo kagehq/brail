@@ -5,20 +5,27 @@ import {
   Res,
   UseGuards,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Request, Response } from 'express';
 import { Server } from '@tus/server';
 import { S3Store } from '@tus/s3-store';
 import * as path from 'path';
+import { LogsService } from '../logs/logs.service';
 
 @Controller('uploads')
 @UseGuards(AuthGuard(['jwt', 'bearer']))
 export class UploadsController {
   private readonly logger = new Logger(UploadsController.name);
   private readonly tusServer: Server;
+  private uploadCounters = new Map<string, { total: number; completed: number }>();
 
-  constructor() {
+  constructor(
+    @Inject(forwardRef(() => LogsService))
+    private readonly logsService: LogsService,
+  ) {
     const bucket = process.env.S3_BUCKET || 'br-deploys';
 
     // Create tus server with S3 store
@@ -59,8 +66,48 @@ export class UploadsController {
       respectForwardedHeaders: true,
       // Max file size (10GB)
       maxSize: 10 * 1024 * 1024 * 1024,
+      onUploadCreate: async (req, res, upload) => {
+        const deployId = req.headers['x-deploy-id'] as string;
+        const relPath = req.headers['x-relpath'] as string;
+        
+        if (deployId && relPath) {
+          const deployLogger = this.logsService.createLogger(deployId);
+          const fileName = path.basename(relPath);
+          
+          // Track upload progress
+          if (!this.uploadCounters.has(deployId)) {
+            this.uploadCounters.set(deployId, { total: 0, completed: 0 });
+          }
+          const counter = this.uploadCounters.get(deployId)!;
+          counter.total++;
+          
+          await deployLogger.info(`Uploading ${fileName}...`);
+          this.logger.log(`Upload started: ${deployId}/${relPath} (${upload.size} bytes)`);
+        }
+        
+        return res;
+      },
       onUploadFinish: async (req, res, upload) => {
-        this.logger.log(`Upload finished: ${upload.id} (${upload.size} bytes)`);
+        const deployId = req.headers['x-deploy-id'] as string;
+        const relPath = req.headers['x-relpath'] as string;
+        
+        if (deployId && relPath) {
+          const deployLogger = this.logsService.createLogger(deployId);
+          const fileName = path.basename(relPath);
+          const sizeKB = (upload.size / 1024).toFixed(2);
+          
+          // Update progress counter
+          const counter = this.uploadCounters.get(deployId);
+          if (counter) {
+            counter.completed++;
+            await deployLogger.info(`✓ Uploaded ${fileName} (${sizeKB} KB) - ${counter.completed}/${counter.total} files`);
+          } else {
+            await deployLogger.info(`✓ Uploaded ${fileName} (${sizeKB} KB)`);
+          }
+          
+          this.logger.log(`Upload finished: ${upload.id} (${upload.size} bytes)`);
+        }
+        
         return res;
       },
     });

@@ -99,6 +99,57 @@ export class DeploysService {
       })
       .sort((a, b) => a.path.localeCompare(b.path));
 
+    // Validation logs
+    await deployLogger.info('Validating deployment...');
+    
+    // Check for index.html (required for static sites)
+    const hasIndexHtml = fileIndex.some(f => f.path === '/index.html');
+    if (hasIndexHtml) {
+      await deployLogger.info('✓ Found index.html');
+    } else {
+      await deployLogger.warn('⚠ No index.html found - deployment may not be accessible');
+    }
+
+    // Detect framework/build tools
+    const detectedFrameworks: string[] = [];
+    const hasPackageJson = fileIndex.some(f => f.path === '/package.json');
+    const hasTailwindConfig = fileIndex.some(f => f.path.includes('tailwind.config'));
+    const hasNextConfig = fileIndex.some(f => f.path === '/next.config.js' || f.path === '/next.config.ts');
+    const hasViteConfig = fileIndex.some(f => f.path === '/vite.config.js' || f.path === '/vite.config.ts');
+    const hasNuxtConfig = fileIndex.some(f => f.path === '/nuxt.config.js' || f.path === '/nuxt.config.ts');
+    
+    if (hasPackageJson) detectedFrameworks.push('Node.js');
+    if (hasTailwindConfig) detectedFrameworks.push('Tailwind CSS');
+    if (hasNextConfig) detectedFrameworks.push('Next.js');
+    if (hasViteConfig) detectedFrameworks.push('Vite');
+    if (hasNuxtConfig) detectedFrameworks.push('Nuxt');
+    
+    if (detectedFrameworks.length > 0) {
+      await deployLogger.info(`Detected: ${detectedFrameworks.join(', ')}`);
+    } else {
+      await deployLogger.info('Detected: Static HTML site');
+    }
+
+    // File type summary
+    const extensions = fileIndex.map(f => {
+      const ext = f.path.split('.').pop()?.toLowerCase() || 'no-ext';
+      return ext;
+    });
+    const extCounts = extensions.reduce((acc, ext) => {
+      acc[ext] = (acc[ext] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const topExt = Object.entries(extCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([ext, count]) => `${count} ${ext}`)
+      .join(', ');
+    
+    if (topExt) {
+      await deployLogger.info(`File types: ${topExt}`);
+    }
+
     // Write file index
     await deployLogger.info('Building file index');
     const indexKey = this.storage.getDeployIndexPath(deployId);
@@ -113,6 +164,17 @@ export class DeploysService {
     );
 
     await deployLogger.info(`Deployment finalized: ${fileCount} files (${(byteSize / 1024).toFixed(2)} KB)`);
+    
+    // Log upload summary
+    await deployLogger.info(`✓ All files uploaded successfully`);
+
+    // Check if build is needed
+    if (hasPackageJson && !hasIndexHtml) {
+      await deployLogger.warn('⚠ Build required: package.json detected but no index.html found');
+      await deployLogger.info('Tip: Pre-build your site locally before deploying, or configure automatic builds');
+    } else if (hasPackageJson && fileIndex.some(f => f.path.includes('node_modules'))) {
+      await deployLogger.warn('⚠ node_modules detected - use .dropignore to exclude build artifacts');
+    }
 
     // Update deploy
     const updated = await this.prisma.deploy.update({
@@ -162,6 +224,52 @@ export class DeploysService {
     
     if (comment) {
       await deployLogger.info(`Deployment note: ${comment}`);
+    }
+
+    // Show deployment info
+    const sizeKB = (Number(deploy.byteSize) / 1024).toFixed(2);
+    const sizeMB = (Number(deploy.byteSize) / (1024 * 1024)).toFixed(2);
+    const displaySize = Number(sizeMB) >= 1 ? `${sizeMB} MB` : `${sizeKB} KB`;
+    await deployLogger.info(`Deployment size: ${deploy.fileCount} files (${displaySize})`);
+
+    // Check if there's a currently active deployment
+    const currentlyActive = await this.prisma.deploy.findFirst({
+      where: {
+        siteId: deploy.siteId,
+        status: 'active',
+      },
+    });
+
+    if (currentlyActive) {
+      const currentSizeKB = (Number(currentlyActive.byteSize) / 1024).toFixed(2);
+      const currentSizeMB = (Number(currentlyActive.byteSize) / (1024 * 1024)).toFixed(2);
+      const currentDisplaySize = Number(currentSizeMB) >= 1 ? `${currentSizeMB} MB` : `${currentSizeKB} KB`;
+      
+      await deployLogger.info(`Replacing deployment ${currentlyActive.id.slice(0, 8)}... (${currentlyActive.fileCount} files, ${currentDisplaySize})`);
+      
+      // Show size comparison
+      const sizeDiff = Number(deploy.byteSize) - Number(currentlyActive.byteSize);
+      const fileDiff = deploy.fileCount - currentlyActive.fileCount;
+      
+      if (sizeDiff > 0) {
+        const diffKB = (sizeDiff / 1024).toFixed(2);
+        const diffMB = (sizeDiff / (1024 * 1024)).toFixed(2);
+        const diffDisplay = Number(diffMB) >= 1 ? `${diffMB} MB` : `${diffKB} KB`;
+        await deployLogger.info(`Size change: +${diffDisplay}`);
+      } else if (sizeDiff < 0) {
+        const diffKB = (Math.abs(sizeDiff) / 1024).toFixed(2);
+        const diffMB = (Math.abs(sizeDiff) / (1024 * 1024)).toFixed(2);
+        const diffDisplay = Number(diffMB) >= 1 ? `${diffMB} MB` : `${diffKB} KB`;
+        await deployLogger.info(`Size change: -${diffDisplay}`);
+      }
+      
+      if (fileDiff > 0) {
+        await deployLogger.info(`File change: +${fileDiff} files`);
+      } else if (fileDiff < 0) {
+        await deployLogger.info(`File change: ${fileDiff} files`);
+      }
+    } else {
+      await deployLogger.info('First deployment for this site');
     }
 
     // Write current.json to point to this deploy
@@ -226,8 +334,15 @@ export class DeploysService {
 
     const publicUrl = `${process.env.DEV_PUBLIC_BASE || 'http://localhost:3000'}/public/${deploy.siteId}/`;
 
+    // Show timing information
+    const totalDuration = Date.now() - new Date(deploy.createdAt).getTime();
+    const minutes = Math.floor(totalDuration / 60000);
+    const seconds = ((totalDuration % 60000) / 1000).toFixed(1);
+    const timeDisplay = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+    
     this.logger.log(`Activated deploy ${deployId} for site ${deploy.siteId}`);
     await deployLogger.info(`Deployment activated successfully!`, { publicUrl });
+    await deployLogger.info(`Total deployment time: ${timeDisplay}`);
 
     // TODO: Purge CDN cache (stub)
     await deployLogger.info('Purging CDN cache...');

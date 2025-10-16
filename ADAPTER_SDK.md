@@ -1,6 +1,6 @@
-# Brail Adapter SDK (`@br/adapter-kit`)
+# Brail Adapter SDK (`@brailhq/adapter-kit`)
 
-The **`@br/adapter-kit`** is a public TypeScript SDK for building custom deployment adapters for Brail.
+The **`@brailhq/adapter-kit`** is a public TypeScript SDK for building custom deployment adapters for Brail.
 
 ## What's Included
 
@@ -15,19 +15,19 @@ import {
   type ActivateInput,      // Input for activate method
   type RollbackInput,      // Input for rollback method
   type ReleaseInfo,        // Info about a release
-} from '@br/adapter-kit';
+} from '@brailhq/adapter-kit';
 ```
 
 ### Helper Functions
 
 ```typescript
-import { validateRequired } from '@br/adapter-kit';
+import { validateRequired, createLogger, sleep, retry } from '@brailhq/adapter-kit';
 
 // Validate that config has required fields
 const result = validateRequired(config, [
   { name: 'apiKey', type: 'string' },
   { name: 'projectId', type: 'string' },
-  { name: 'region', type: 'string', optional: true },
+  { name: 'region', type: 'string' },
 ]);
 
 if (!result.valid) {
@@ -53,7 +53,7 @@ npx create-br-adapter
 This creates:
 ```
 br-adapter-railway/
-├── package.json         # With @br/adapter-kit as peerDependency
+├── package.json         # With @brailhq/adapter-kit as peerDependency
 ├── tsconfig.json        # TypeScript config
 ├── src/
 │   └── index.ts         # Your adapter implementation
@@ -66,8 +66,8 @@ br-adapter-railway/
 Edit `src/index.ts`:
 
 ```typescript
-import { defineAdapter, validateRequired } from '@br/adapter-kit';
-import type { AdapterContext, UploadInput, ActivateInput } from '@br/adapter-kit';
+import { defineAdapter, validateRequired } from '@brailhq/adapter-kit';
+import type { AdapterContext, UploadInput, ActivateInput } from '@brailhq/adapter-kit';
 
 export default defineAdapter(() => ({
   name: 'railway',
@@ -116,9 +116,9 @@ export default defineAdapter(() => ({
     // Optional: List all releases from Railway
     return [
       {
-        deployId: 'deploy-123',
-        active: true,
-        createdAt: '2025-10-16T10:00:00Z',
+        id: 'deploy-123',
+        timestamp: '2025-10-16T10:00:00Z',
+        status: 'active',
       },
     ];
   },
@@ -227,6 +227,7 @@ Activate a deployment (make it live).
   config: unknown;
   site: { id: string; name: string };
   target?: 'preview' | 'production';  // Defaults to 'preview'
+  platformDeploymentId?: string;  // Platform-specific deployment ID (if available)
 }
 ```
 
@@ -241,6 +242,7 @@ Rollback to a previous deployment.
   toDeployId: string;  // Deploy ID to rollback to
   config: unknown;
   site: { id: string; name: string };
+  platformDeploymentId?: string;  // Platform-specific deployment ID (if available)
 }
 ```
 
@@ -250,10 +252,36 @@ List all releases/deployments from your platform.
 **Returns**:
 ```typescript
 Array<{
-  deployId: string;
-  active: boolean;
-  createdAt?: string;
+  id: string;
+  timestamp: string;
+  status: 'active' | 'staged' | 'failed';
 }>
+```
+
+#### `cleanupOld(ctx, config, keep)`
+Clean up old releases/deployments, keeping only the most recent ones.
+
+**Input**:
+```typescript
+{
+  ctx: AdapterContext;
+  config: unknown;
+  keep: number;  // Number of releases to keep
+}
+```
+
+**Example**:
+```typescript
+async cleanupOld(ctx: AdapterContext, config: unknown, keep: number) {
+  ctx.logger.info(`Cleaning up old releases, keeping ${keep} most recent`);
+  
+  const releases = await this.listReleases(ctx, config);
+  const toDelete = releases.slice(keep); // Remove all but the most recent 'keep' releases
+  
+  for (const release of toDelete) {
+    // Delete old release
+  }
+}
 ```
 
 ---
@@ -265,18 +293,18 @@ Array<{
 Validate that config object has required fields:
 
 ```typescript
-import { validateRequired } from '@br/adapter-kit';
+import { validateRequired } from '@brailhq/adapter-kit';
 
 const result = validateRequired(config, [
   { name: 'apiKey', type: 'string' },
-  { name: 'port', type: 'number', optional: true },
+  { name: 'port', type: 'number' },
   { name: 'enabled', type: 'boolean' },
 ]);
 
 if (!result.valid) {
   console.error(result.reason);
   // "Missing required field: apiKey"
-  // "Field 'port' must be of type number"
+  // "Field 'port' must be number, got string"
 }
 ```
 
@@ -287,6 +315,58 @@ if (!result.valid) {
 - `'object'`
 - `'array'`
 
+**Note**: All fields are required. For optional fields, validate them separately after checking the config object exists.
+
+### `createLogger(adapterName, baseLogger?)`
+
+Create a logger that automatically prefixes all messages with your adapter name:
+
+```typescript
+import { createLogger } from '@brailhq/adapter-kit';
+
+const logger = createLogger('my-adapter');
+
+logger.info('Starting deployment'); // Logs: "[my-adapter] Starting deployment"
+logger.error('Upload failed', error);
+logger.warn('Retrying...');
+logger.debug('Debug info');
+```
+
+### `sleep(ms)`
+
+Simple promise-based sleep helper:
+
+```typescript
+import { sleep } from '@brailhq/adapter-kit';
+
+async function myFunction() {
+  await sleep(1000); // Wait 1 second
+}
+```
+
+### `retry(fn, options)`
+
+Retry a function with exponential backoff:
+
+```typescript
+import { retry } from '@brailhq/adapter-kit';
+
+const result = await retry(
+  async () => {
+    // Your operation that might fail
+    return await apiCall();
+  },
+  {
+    maxAttempts: 3,
+    delayMs: 1000,
+    backoff: 2, // Exponential backoff multiplier
+    onRetry: (attempt, error) => {
+      console.log(`Attempt ${attempt} failed: ${error.message}`);
+    }
+  }
+);
+```
+
 ---
 
 ## Context & Logging
@@ -295,12 +375,13 @@ Every adapter method receives a `context` object:
 
 ```typescript
 ctx.logger.info('Deployment started');
+ctx.logger.warn('Warning message');
 ctx.logger.debug('Uploading file: index.html');
 ctx.logger.error('Upload failed:', error);
 ```
 
 **Context Properties**:
-- `logger` - Logger instance (info, debug, error methods)
+- `logger` - Logger instance (info, warn, debug, error methods)
 - `tmpDir` - Temporary directory for scratch work (optional)
 
 ---
@@ -427,7 +508,7 @@ export default defineAdapter(() => ({
 Before publishing your adapter:
 
 - [ ] Package name starts with `br-adapter-` (e.g., `br-adapter-railway`)
-- [ ] `@br/adapter-kit` is listed as `peerDependency`
+- [ ] `@brailhq/adapter-kit` is listed as `peerDependency`
 - [ ] TypeScript declarations are built (`npm run build`)
 - [ ] README includes:
   - [ ] Installation instructions
@@ -495,10 +576,11 @@ Want to add helper utilities to the SDK? Submit a PR!
 
 ## 📚 Additional Resources
 
-- **Example Adapters**: See `packages/adapters/src/` for built-in adapters
+- **Example Adapters**: See `packages/adapters/src/` in the Brail repository for built-in adapters
 - **CLI Commands**: Run `br adapters ls` to list all available adapters
 - **API Docs**: See `apps/api/src/adapters/` for adapter registry implementation
 - **Type Definitions**: See `packages/adapter-kit/src/index.ts` for all types
+- **npm Package**: https://www.npmjs.com/package/@brailhq/adapter-kit
 
 ---
 
