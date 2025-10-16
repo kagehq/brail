@@ -38,17 +38,6 @@ The CLI will ask you:
 3. **Author** - Your name or organization
 4. **License** - License type (MIT, Apache-2.0, etc.)
 
-## Project Structure
-
-```
-my-custom-adapter/
-├── src/
-│   └── index.ts          # Main adapter implementation
-├── package.json          # Package configuration
-├── tsconfig.json         # TypeScript config
-└── README.md            # Documentation
-```
-
 ## Next Steps
 
 After creating your adapter:

@@ -183,15 +183,16 @@ br drop ./dist --site <siteId> --profile railway
 
 ## Custom Adapters
 
-Build your own adapter with `@br/adapter-kit`:
+Build your own adapter with [`@brailhq/adapter-kit`](https://www.npmjs.com/package/@brailhq/adapter-kit):
 
 ```bash
-npx create-br-adapter
-cd br-adapter-yourname
-npm run dev
+npm create br-adapter my-adapter
+cd my-adapter
+npm install
+npm run build
 ```
 
-See `ADAPTER_SDK.md` for full docs.
+See [`ADAPTER_SDK.md`](./ADAPTER_SDK.md) for full docs or check out the [npm package](https://www.npmjs.com/package/@brailhq/adapter-kit).
 
 **Built-in adapters:** ssh-rsync, ftp, s3, vercel, cloudflare-pages, netlify, railway, fly, github-pages
 
@@ -269,7 +270,7 @@ pnpm test
 
 ## Contributing
 
-PRs welcome! To add an adapter, run `npx create-br-adapter` and publish to npm as `br-adapter-<name>`.
+PRs welcome! To add an adapter, run `npm create br-adapter` and publish to npm.
 
 ## License
 
