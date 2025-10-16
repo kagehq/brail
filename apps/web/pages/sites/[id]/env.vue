@@ -82,6 +82,15 @@
             Templates
           </button>
           <button
+            @click="showImportModal = true"
+            class="px-4 py-2 bg-gray-500/10 hover:bg-gray-500/15 text-gray-300 hover:text-white rounded-lg border border-gray-500/20 hover:border-gray-500/40 transition-all text-sm font-semibold flex items-center gap-2"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import
+          </button>
+          <button
             @click="openAddModal()"
             class="px-4 py-2 bg-blue-300 text-black rounded-lg hover:bg-blue-400 transition font-semibold text-sm flex items-center gap-2"
           >
@@ -289,12 +298,80 @@
           <button
             @click="saveVariable"
             :disabled="saving || !formData.key || !formData.value"
-            class="flex-1 px-4 py-3 bg-blue-300 text-black rounded-lg hover:bg-blue-400 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-3 bg-blue-300 text-sm text-black rounded-lg hover:bg-blue-400 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {{ saving ? 'Saving...' : modalMode === 'add' ? 'Add Variable' : 'Save Changes' }}
           </button>
           <button
             @click="showModal = false"
+            class="px-4 py-3 border text-sm border-gray-500/25 text-gray-300 hover:text-white hover:border-gray-500/40 rounded-lg transition font-medium"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div
+      v-if="showImportModal"
+      class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+      @click.self="showImportModal = false"
+    >
+      <div class="bg-black border border-gray-500/25 rounded-xl shadow-2xl max-w-2xl w-full p-6 animate-fade-in">
+        <h2 class="text-2xl font-bold text-white mb-2">Import Variables</h2>
+        <p class="text-sm text-gray-400 mb-4">Paste your .env file content below. One variable per line in KEY=VALUE format.</p>
+        
+        <div class="space-y-4 mb-6">
+          <!-- Import Text Area -->
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">
+              Environment Variables
+            </label>
+            <textarea
+              v-model="importText"
+              rows="12"
+              placeholder="API_URL=https://api.example.com
+API_KEY=secret123
+DATABASE_URL=postgresql://localhost:5432/db
+NODE_ENV=production
+
+# Comments are ignored
+NEXT_PUBLIC_SITE_URL=https://example.com"
+              class="w-full bg-gray-500/10 border border-gray-500/25 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-300/50 placeholder:text-gray-600 font-mono text-sm resize-none"
+            ></textarea>
+            <p class="text-xs text-gray-500 mt-2">
+              {{ importPreviewCount }} variable{{ importPreviewCount !== 1 ? 's' : '' }} detected
+            </p>
+          </div>
+
+          <!-- Secret Toggle -->
+          <div class="flex items-center justify-between bg-gray-500/5 border border-gray-500/20 rounded-lg p-3">
+            <div>
+              <div class="text-sm font-medium text-white">Import as Secrets</div>
+              <div class="text-xs text-gray-500">All imported values will be masked in the UI</div>
+            </div>
+            <label class="relative inline-block w-12 h-6 cursor-pointer">
+              <input
+                v-model="importAsSecret"
+                type="checkbox"
+                class="sr-only peer"
+              />
+              <div class="w-full h-full bg-gray-500/20 peer-focus:ring-2 peer-focus:ring-blue-300/50 rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-300"></div>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex gap-3">
+          <button
+            @click="bulkImport"
+            :disabled="importing || !importText.trim()"
+            class="flex-1 px-4 py-3 bg-blue-300 text-black rounded-lg hover:bg-blue-400 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ importing ? 'Importing...' : `Import ${importPreviewCount} Variable${importPreviewCount !== 1 ? 's' : ''}` }}
+          </button>
+          <button
+            @click="showImportModal = false; importText = ''"
             class="px-4 py-3 border border-gray-500/25 text-gray-300 hover:text-white hover:border-gray-500/40 rounded-lg transition font-medium"
           >
             Cancel
@@ -332,10 +409,14 @@ const selectedScope = ref('build');
 const searchQuery = ref('');
 const showModal = ref(false);
 const showTemplates = ref(false);
+const showImportModal = ref(false);
 const modalMode = ref<'add' | 'edit'>('add');
 const saving = ref(false);
 const revealing = ref<string | null>(null);
 const revealedVars = reactive(new Map<string, string>());
+const importText = ref('');
+const importAsSecret = ref(true);
+const importing = ref(false);
 
 const formData = ref({
   key: '',
@@ -420,6 +501,21 @@ const filteredVars = computed(() => {
   }
   
   return vars;
+});
+
+const importPreviewCount = computed(() => {
+  if (!importText.value.trim()) return 0;
+  
+  const lines = importText.value.split('\n');
+  let count = 0;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    if (trimmed.match(/^[A-Z_][A-Z0-9_]*=/)) count++;
+  }
+  
+  return count;
 });
 
 async function loadEnvVars() {
@@ -562,6 +658,81 @@ function copyToClipboard(text: string) {
   }).catch(() => {
     toast.error('Copy Failed', 'Could not copy to clipboard');
   });
+}
+
+async function bulkImport() {
+  if (!importText.value.trim()) return;
+  
+  importing.value = true;
+  
+  try {
+    const lines = importText.value.split('\n');
+    const vars: Record<string, string> = {};
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Skip empty lines and comments
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      
+      // Parse KEY=VALUE
+      const match = trimmed.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+      if (!match) {
+        console.warn(`Skipping invalid line: ${line}`);
+        continue;
+      }
+      
+      const [, key, value] = match;
+      
+      // Remove quotes if present
+      let cleanValue = value;
+      if ((cleanValue.startsWith('"') && cleanValue.endsWith('"')) ||
+          (cleanValue.startsWith("'") && cleanValue.endsWith("'"))) {
+        cleanValue = cleanValue.slice(1, -1);
+      }
+      
+      vars[key] = cleanValue;
+    }
+    
+    const count = Object.keys(vars).length;
+    
+    if (count === 0) {
+      toast.error('No Valid Variables', 'No valid KEY=VALUE pairs found');
+      return;
+    }
+    
+    // Bulk import via API
+    const response = await fetch(`${config.public.apiUrl}/v1/sites/${siteId}/env/bulk`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scope: selectedScope.value,
+        vars,
+        isSecret: importAsSecret.value,
+      }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to import variables');
+    }
+    
+    const result = await response.json();
+    
+    await loadEnvVars();
+    toast.success(
+      'Variables Imported',
+      `Successfully imported ${result.count} variable${result.count !== 1 ? 's' : ''}`
+    );
+    
+    showImportModal.value = false;
+    importText.value = '';
+  } catch (error: any) {
+    toast.error('Import Failed', error.message);
+  } finally {
+    importing.value = false;
+  }
 }
 
 function formatDate(date: string | Date) {
