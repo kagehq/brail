@@ -4,6 +4,7 @@ import { StorageService } from '../storage/storage.service';
 import { AdapterRegistry } from '../adapters/adapter.registry';
 import { ProfilesService } from '../profiles/profiles.service';
 import { HealthService } from '../health/health.service';
+import { EnvService } from '../env/env.service';
 import type { AdapterContext } from '@br/adapters';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -29,6 +30,7 @@ export class ReleasesService {
     private readonly adapterRegistry: AdapterRegistry,
     private readonly profilesService: ProfilesService,
     private readonly healthService: HealthService,
+    private readonly envService: EnvService,
   ) {}
 
   /**
@@ -82,11 +84,29 @@ export class ReleasesService {
       // Download all files for this deploy
       await this.downloadDeployFiles(deployId, tmpDir);
 
+      // Get environment variables for this deployment
+      const runtimeScope = target === 'production' ? 'runtime:production' : 'runtime:preview';
+      const adapterScope = `adapter:${adapter.name}`;
+      
+      // Fetch env vars for runtime and adapter-specific scopes
+      const [runtimeEnvVars, adapterEnvVars] = await Promise.all([
+        this.envService.exportForScope(deploy.siteId, runtimeScope).catch(() => ({})),
+        this.envService.exportForScope(deploy.siteId, adapterScope).catch(() => ({})),
+      ]);
+
+      // Merge env vars (adapter-specific takes precedence)
+      const envVars = { ...runtimeEnvVars, ...adapterEnvVars };
+
+      this.logger.log(
+        `Injecting ${Object.keys(envVars).length} environment variables for ${adapter.name} (${target})`,
+      );
+
       // Create adapter context
       const ctx: AdapterContext = {
         logger: this.adapterLogger,
         tmpDir,
-      };
+        env: envVars, // Inject env vars into adapter context
+      } as any; // Cast to any since AdapterContext doesn't have env yet
 
       // Upload to destination
       const result = await adapter.upload(ctx, {
@@ -176,10 +196,28 @@ export class ReleasesService {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Get environment variables for this deployment
+    const runtimeScope = target === 'production' ? 'runtime:production' : 'runtime:preview';
+    const adapterScope = `adapter:${adapter.name}`;
+    
+    // Fetch env vars for runtime and adapter-specific scopes
+    const [runtimeEnvVars, adapterEnvVars] = await Promise.all([
+      this.envService.exportForScope(deploy.siteId, runtimeScope).catch(() => ({})),
+      this.envService.exportForScope(deploy.siteId, adapterScope).catch(() => ({})),
+    ]);
+
+    // Merge env vars (adapter-specific takes precedence)
+    const envVars = { ...runtimeEnvVars, ...adapterEnvVars };
+
+    this.logger.log(
+      `Injecting ${Object.keys(envVars).length} environment variables for ${adapter.name} activation (${target})`,
+    );
+
     // Create adapter context
     const ctx: AdapterContext = {
       logger: this.adapterLogger,
-    };
+      env: envVars, // Inject env vars into adapter context
+    } as any; // Cast to any since AdapterContext doesn't have env yet
 
     try {
       // Activate with target and platform deployment ID
