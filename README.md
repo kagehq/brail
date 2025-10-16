@@ -9,6 +9,7 @@
 - Deploy to your own servers (SSH/FTP), S3, or platforms (Vercel/Netlify/Railway)
 - Zero downtime deployments with instant rollbacks
 - Auto-detect and build Next.js, Astro, Vite, Nuxt, SvelteKit
+- Scoped environment variables with encryption (build, runtime, adapter)
 - Custom domains with DNS verification
 - Auto-SSL via Let's Encrypt (HTTPS made easy)
 - Replace single files without full redeploy
@@ -112,6 +113,120 @@ br build . --skip-install
 **Supported:** Next.js, Astro, Vite, Nuxt, SvelteKit, TanStack Start, React, Vue, static HTML
 
 Brail validates your build output and warns about SSR routes or missing configs. Build logs are captured and downloadable from the Activity tab.
+
+## Environment Variables
+
+Manage secrets and configuration with **scoped environment variables**. Variables are encrypted at rest (AES-256-GCM) and can be scoped to specific environments and adapters.
+
+### Available Scopes
+
+- **`build`** - Injected during build process (coming soon in CLI)
+- **`runtime:preview`** - For preview deployments
+- **`runtime:production`** - For production deployments
+- **`adapter:<name>`** - Platform-specific (e.g., `adapter:vercel`, `adapter:s3`)
+- **`ssh-agent`** - For SSH deployments (coming soon)
+
+### CLI Usage
+
+```bash
+# Set a variable
+br env set API_URL=https://api.example.com --site <siteId> --scope build --public
+br env set API_KEY=secret123 --site <siteId> --scope build
+
+# List variables (secrets are masked)
+br env list --site <siteId> --scope build
+
+# Reveal a secret value
+br env reveal API_KEY --site <siteId> --scope build
+
+# Import from .env file
+br env import .env.production --site <siteId> --scope runtime:production --yes
+
+# Export to .env file (decrypted)
+br env export --site <siteId> --scope build --output .env.local
+
+# Delete a variable
+br env delete API_KEY --site <siteId> --scope build --yes
+```
+
+### Web Interface
+
+Navigate to **Environment** tab in your site dashboard:
+
+1. **Add variables** with the "Add Variable" button
+2. **Reveal secrets** by clicking the "Reveal" button
+3. **Search and filter** variables in real-time
+4. **Use templates** for common variables (NODE_ENV, API_URL, etc.)
+5. **Switch scopes** using the tabs at the top
+
+### How It Works
+
+**Encryption:**
+- All values are encrypted using AES-256-GCM before storage
+- Requires `ENCRYPTION_KEY` in your `.env` (32 bytes, generate with `openssl rand -hex 32`)
+- Only decrypted when needed (builds, deployments, or explicit reveal)
+
+**Scope Resolution:**
+- Variables are fetched based on deployment target
+- Adapter-specific variables override runtime variables
+- Example: `adapter:vercel` vars take precedence over `runtime:production`
+
+**Integration:**
+- **Deployments**: Automatically injected when staging/activating releases
+- **Builds**: Will be injected into build process (CLI feature coming soon)
+- **Adapters**: Access via `ctx.env` in custom adapters
+
+### Examples
+
+**API Configuration:**
+```bash
+# Set API URL for both environments
+br env set API_URL=https://api-staging.example.com --site <siteId> --scope runtime:preview --public
+br env set API_URL=https://api.example.com --site <siteId> --scope runtime:production --public
+
+# Set API key (secret)
+br env set API_KEY=prod_key_123 --site <siteId> --scope runtime:production
+```
+
+**Vercel-Specific Variables:**
+```bash
+# These only apply when deploying to Vercel
+br env set VERCEL_TOKEN=<token> --site <siteId> --scope adapter:vercel
+br env set VERCEL_PROJECT_ID=<id> --site <siteId> --scope adapter:vercel
+```
+
+**Import from File:**
+```bash
+# .env.production
+NODE_ENV=production
+API_URL=https://api.example.com
+API_KEY=secret_production_key
+DATABASE_URL=postgresql://user:pass@host:5432/db
+
+# Import all at once
+br env import .env.production --site <siteId> --scope runtime:production --yes
+```
+
+### Security Best Practices
+
+1. **Never commit secrets** - Use `.gitignore` for `.env` files
+2. **Use secret mode** - Mark sensitive values as secrets (default behavior)
+3. **Scope appropriately** - Use production scope only for production secrets
+4. **Rotate regularly** - Update secrets periodically, especially API keys
+5. **Audit activity** - Check the Activity tab for env var changes
+
+### Templates
+
+Brail provides quick-add templates for common variables:
+
+- `NODE_ENV` - Node environment (development/production)
+- `API_URL` - API base URL
+- `API_KEY` - API authentication key
+- `DATABASE_URL` - Database connection string
+- `NEXT_PUBLIC_*` - Next.js public variables
+- `VITE_*` - Vite public variables
+- `PUBLIC_*` - Generic public variables
+- `SECRET_KEY` - Application secret key
 
 ## Custom Domains
 
