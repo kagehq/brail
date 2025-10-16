@@ -186,10 +186,12 @@ br drop ./dist --site <siteId> --profile railway
 Build your own adapter with [`@brailhq/adapter-kit`](https://www.npmjs.com/package/@brailhq/adapter-kit):
 
 ```bash
-npm create br-adapter my-adapter
-cd my-adapter
+npm create br-adapter
+# Follow the interactive prompts
+
+cd br-adapter-{name}
 npm install
-npm run build
+npm run dev
 ```
 
 See [`ADAPTER_SDK.md`](./ADAPTER_SDK.md) for full docs or check out the [npm package](https://www.npmjs.com/package/@brailhq/adapter-kit).

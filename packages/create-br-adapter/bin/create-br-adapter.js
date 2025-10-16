@@ -61,10 +61,10 @@ try {
     author: '',
     license: 'MIT',
     peerDependencies: {
-      '@br/adapter-kit': '^0.1.0',
+      '@brailhq/adapter-kit': '^0.1.0',
     },
     devDependencies: {
-      '@br/adapter-kit': '^0.1.0',
+      '@brailhq/adapter-kit': '^0.1.0',
       '@types/node': '^20.10.0',
       'typescript': '^5.3.3',
     },
@@ -102,7 +102,7 @@ try {
   );
 
   // Create src/index.ts
-  const adapterCode = `import { defineAdapter, validateRequired, type AdapterContext, type UploadInput, type ActivateInput, type RollbackInput } from '@br/adapter-kit';
+  const adapterCode = `import { defineAdapter, validateRequired, type AdapterContext, type UploadInput, type ActivateInput, type RollbackInput } from '@brailhq/adapter-kit';
 
 /**
  * ${answers.displayName} Adapter
