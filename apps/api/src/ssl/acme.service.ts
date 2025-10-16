@@ -54,6 +54,7 @@ export class AcmeService {
 
     const domain = await this.prisma.domain.findUnique({
       where: { id: domainId },
+      include: { certificates: { where: { status: 'active' }, orderBy: { createdAt: 'desc' }, take: 1 } },
     });
 
     if (!domain) {
@@ -62,6 +63,18 @@ export class AcmeService {
 
     if (domain.status !== 'verified') {
       throw new Error('Domain must be verified before requesting certificate');
+    }
+
+    // Store the account private key so we can save it later
+    let accountPrivateKey: Buffer;
+    const existingCert = domain.certificates[0];
+    
+    if (existingCert?.accountKey) {
+      // Reuse existing account key
+      accountPrivateKey = Buffer.from(this.decrypt(existingCert.accountKey), 'utf8');
+    } else {
+      // Generate new account key
+      accountPrivateKey = await acme.crypto.createPrivateKey();
     }
 
     try {
@@ -132,15 +145,13 @@ export class AcmeService {
       const x509 = await acme.crypto.readCertificateInfo(cert);
       
       // Store certificate in database
-      const accountKey = client.getAccountKey();
-      
       await this.prisma.sslCertificate.create({
         data: {
           domainId,
           hostname: domain.hostname,
           certPem: cert,
           keyPem: this.encrypt(privateKey.toString()),
-          accountKey: this.encrypt(accountKey.toString()),
+          accountKey: this.encrypt(accountPrivateKey.toString()),
           orderUrl: order.url,
           issuer: x509.issuer.commonName || 'Let\'s Encrypt',
           issuedAt: x509.notBefore,
