@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { toast } from 'vue-sonner';
 
 interface Notification {
   id: string;
@@ -11,7 +12,6 @@ interface Notification {
 
 export const useNotifications = () => {
   const config = useRuntimeConfig();
-  const toast = useToast();
   
   let socket: Socket | null = null;
 
@@ -63,17 +63,25 @@ export const useNotifications = () => {
 
     switch (notification.type) {
       case 'success':
-        toast.success(notification.title, notification.message);
+        toast.success(notification.title, {
+          description: notification.message
+        });
         break;
       case 'error':
-        toast.error(notification.title, notification.message);
+        toast.error(notification.title, {
+          description: notification.message
+        });
         break;
       case 'warning':
-        toast.warning(notification.title, notification.message);
+        toast.warning(notification.title, {
+          description: notification.message
+        });
         break;
       case 'info':
       default:
-        toast.info(notification.title, notification.message);
+        toast.info(notification.title, {
+          description: notification.message
+        });
         break;
     }
   };

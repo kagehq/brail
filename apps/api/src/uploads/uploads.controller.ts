@@ -82,7 +82,8 @@ export class UploadsController {
           counter.total++;
           
           await deployLogger.info(`Uploading ${fileName}...`);
-          this.logger.log(`Upload started: ${deployId}/${relPath} (${upload.size} bytes)`);
+          const size = upload.size || 0;
+          this.logger.log(`Upload started: ${deployId}/${relPath} (${size} bytes)`);
         }
         
         return res;
@@ -94,7 +95,8 @@ export class UploadsController {
         if (deployId && relPath) {
           const deployLogger = this.logsService.createLogger(deployId);
           const fileName = path.basename(relPath);
-          const sizeKB = (upload.size / 1024).toFixed(2);
+          const size = upload.size || 0;
+          const sizeKB = (size / 1024).toFixed(2);
           
           // Update progress counter
           const counter = this.uploadCounters.get(deployId);
@@ -105,7 +107,7 @@ export class UploadsController {
             await deployLogger.info(`✓ Uploaded ${fileName} (${sizeKB} KB)`);
           }
           
-          this.logger.log(`Upload finished: ${upload.id} (${upload.size} bytes)`);
+          this.logger.log(`Upload finished: ${upload.id} (${size} bytes)`);
         }
         
         return res;

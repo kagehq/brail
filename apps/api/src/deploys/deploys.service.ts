@@ -198,15 +198,16 @@ export class DeploysService {
       meta: { fileCount, byteSize },
     });
 
-    // Send notification
-    this.notifications.emitToSite(deploy.siteId, {
-      id: `deploy-uploaded-${deployId}`,
-      type: 'success',
-      title: 'Upload Complete',
-      message: `${fileCount} files uploaded successfully`,
-      timestamp: new Date(),
-      metadata: { deployId },
-    });
+    // NOTE: Notification disabled to avoid duplicates with UI feedback
+    // The DeployUploader component already shows success toasts
+    // this.notifications.emitToSite(deploy.siteId, {
+    //   id: `deploy-uploaded-${deployId}`,
+    //   type: 'success',
+    //   title: 'Upload Complete',
+    //   message: `${fileCount} files uploaded successfully`,
+    //   timestamp: new Date(),
+    //   metadata: { deployId },
+    // });
 
     return updated;
   }
@@ -322,15 +323,16 @@ export class DeploysService {
       meta: { adapter: 'brail' },
     });
 
-    // Send notification
-    this.notifications.emitToSite(deploy.siteId, {
-      id: `deploy-activated-${deployId}`,
-      type: 'success',
-      title: 'Deployment Activated!',
-      message: 'Your site is now live',
-      timestamp: new Date(),
-      metadata: { deployId },
-    });
+    // NOTE: Notification disabled to avoid duplicates with UI feedback
+    // The UI components already show success toasts when activating
+    // this.notifications.emitToSite(deploy.siteId, {
+    //   id: `deploy-activated-${deployId}`,
+    //   type: 'success',
+    //   title: 'Deployment Activated!',
+    //   message: 'Your site is now live',
+    //   timestamp: new Date(),
+    //   metadata: { deployId },
+    // });
 
     const publicUrl = `${process.env.DEV_PUBLIC_BASE || 'http://localhost:3000'}/public/${deploy.siteId}/`;
 
