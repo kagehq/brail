@@ -23,7 +23,7 @@ export class EnvController {
    * List environment variables for a site
    * GET /v1/sites/:siteId/env?scope=build
    */
-  @Get('v1/sites/:siteId/env')
+  @Get('sites/:siteId/env')
   async listEnvVars(
     @Param('siteId') siteId: string,
     @Query('scope') scope?: string,
@@ -42,7 +42,7 @@ export class EnvController {
    * Get a single environment variable
    * GET /v1/sites/:siteId/env/:scope/:key
    */
-  @Get('v1/sites/:siteId/env/:scope/:key')
+  @Get('sites/:siteId/env/:scope/:key')
   async getEnvVar(
     @Param('siteId') siteId: string,
     @Param('scope') scope: string,
@@ -62,7 +62,7 @@ export class EnvController {
    * Reveal the actual value of a secret environment variable
    * GET /v1/sites/:siteId/env/:scope/:key/reveal
    */
-  @Get('v1/sites/:siteId/env/:scope/:key/reveal')
+  @Get('sites/:siteId/env/:scope/:key/reveal')
   async revealEnvVar(
     @Param('siteId') siteId: string,
     @Param('scope') scope: string,
@@ -84,7 +84,7 @@ export class EnvController {
    * POST /v1/sites/:siteId/env
    * Body: { scope, key, value, isSecret? }
    */
-  @Post('v1/sites/:siteId/env')
+  @Post('sites/:siteId/env')
   async setEnvVar(
     @Param('siteId') siteId: string,
     @Body() dto: SetEnvVarDto,
@@ -108,7 +108,7 @@ export class EnvController {
    * DELETE /v1/sites/:siteId/env
    * Body: { scope, key }
    */
-  @Delete('v1/sites/:siteId/env')
+  @Delete('sites/:siteId/env')
   async deleteEnvVar(
     @Param('siteId') siteId: string,
     @Body() body: { scope: string; key: string },
@@ -144,7 +144,7 @@ export class EnvController {
    * POST /v1/sites/:siteId/env/bulk
    * Body: { scope, vars: { KEY: "value", ... }, isSecret? }
    */
-  @Post('v1/sites/:siteId/env/bulk')
+  @Post('sites/:siteId/env/bulk')
   async bulkSetEnvVars(
     @Param('siteId') siteId: string,
     @Body() body: { scope: string; vars: Record<string, string>; isSecret?: boolean },
@@ -181,7 +181,7 @@ export class EnvController {
    * Delete all environment variables for a scope
    * DELETE /v1/sites/:siteId/env/scope/:scope
    */
-  @Delete('v1/sites/:siteId/env/scope/:scope')
+  @Delete('sites/:siteId/env/scope/:scope')
   async deleteScopeEnvVars(
     @Param('siteId') siteId: string,
     @Param('scope') scope: string,
@@ -216,7 +216,7 @@ export class EnvController {
    * Export environment variables for a scope (decrypted)
    * GET /v1/sites/:siteId/env/export?scope=build
    */
-  @Get('v1/sites/:siteId/env/export')
+  @Get('sites/:siteId/env/export')
   async exportEnvVars(
     @Param('siteId') siteId: string,
     @Query('scope') scope: string,
