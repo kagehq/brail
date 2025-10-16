@@ -15,23 +15,43 @@
         <p class="text-gray-400 text-sm">Manage environment variables for builds and deployments</p>
       </div>
 
-      <!-- Scope Tabs -->
-      <div class="mb-6 border-b border-gray-500/20">
-        <div class="flex gap-2 overflow-x-auto pb-2">
-          <button
-            v-for="scope in scopes"
-            :key="scope.value"
-            @click="selectedScope = scope.value"
-            :class="[
-              'px-4 py-2 rounded-t-lg font-medium text-sm whitespace-nowrap transition-all',
-              selectedScope === scope.value
-                ? 'bg-gray-500/20 text-white border-b-2 border-blue-300'
-                : 'text-gray-400 hover:text-white hover:bg-gray-500/10'
-            ]"
+      <!-- Scope Selector -->
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-300 mb-2">Scope</label>
+        <div class="relative max-w-xs">
+          <select
+            v-model="selectedScope"
+            class="w-full bg-gray-500/10 hover:bg-gray-500/15 border border-gray-500/25 hover:border-gray-500/40 text-white rounded-lg px-4 py-3 pr-10 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-300/50 focus:border-blue-300/50 transition-all appearance-none cursor-pointer"
           >
-            {{ scope.label }}
-          </button>
+            <optgroup label="Build & Runtime">
+              <option value="build">Build</option>
+              <option value="runtime:preview">Runtime (Preview)</option>
+              <option value="runtime:production">Runtime (Production)</option>
+            </optgroup>
+            <optgroup label="Platform Adapters">
+              <option value="adapter:vercel">Vercel</option>
+              <option value="adapter:cloudflare">Cloudflare</option>
+              <option value="adapter:netlify">Netlify</option>
+              <option value="adapter:railway">Railway</option>
+              <option value="adapter:fly">Fly.io</option>
+              <option value="adapter:s3">S3</option>
+              <option value="adapter:github-pages">GitHub Pages</option>
+              <option value="adapter:ftp">FTP</option>
+              <option value="adapter:ssh-rsync">SSH/Rsync</option>
+            </optgroup>
+            <optgroup label="Other">
+              <option value="ssh-agent">SSH Agent</option>
+            </optgroup>
+          </select>
+          <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
         </div>
+        <p class="text-xs text-gray-500 mt-2">
+          {{ selectedScopeDescription }}
+        </p>
       </div>
 
       <!-- Actions Bar -->
@@ -366,6 +386,25 @@ const breadcrumbItems = computed(() => [
 
 const selectedScopeLabel = computed(() => {
   return scopes.find(s => s.value === selectedScope.value)?.label || selectedScope.value;
+});
+
+const selectedScopeDescription = computed(() => {
+  const descriptions: Record<string, string> = {
+    'build': 'Variables injected during build process (npm run build)',
+    'runtime:preview': 'Variables for preview deployments',
+    'runtime:production': 'Variables for production deployments',
+    'adapter:vercel': 'Vercel-specific configuration (API tokens, project IDs)',
+    'adapter:cloudflare': 'Cloudflare Pages-specific configuration',
+    'adapter:netlify': 'Netlify-specific configuration',
+    'adapter:railway': 'Railway-specific configuration',
+    'adapter:fly': 'Fly.io-specific configuration',
+    'adapter:s3': 'S3-specific configuration (bucket, credentials)',
+    'adapter:github-pages': 'GitHub Pages-specific configuration',
+    'adapter:ftp': 'FTP-specific configuration',
+    'adapter:ssh-rsync': 'SSH/Rsync-specific configuration',
+    'ssh-agent': 'SSH agent configuration for deployments',
+  };
+  return descriptions[selectedScope.value] || 'Environment variables for this scope';
 });
 
 const filteredVars = computed(() => {
