@@ -64,6 +64,29 @@ br replace ./app.css --site <siteId> --dest /css/app.css --yes
 br watch --site <siteId> --root ./dist --auto
 ```
 
+## Ignore Files with .dropignore
+
+Create a `.dropignore` file to exclude files and directories from deployment (similar to `.gitignore`):
+
+```
+# .dropignore example
+node_modules/
+.git/
+*.log
+.env
+.DS_Store
+src/
+*.test.js
+```
+
+**Supported patterns:**
+- `node_modules/` - Ignore entire directory
+- `*.log` - Wildcard patterns
+- `.env` - Exact file names
+- `# comments` - Lines starting with # are ignored
+
+This works with both drag-and-drop uploads and CLI deployments.
+
 ## Build Your Project
 
 Brail automatically detects and builds popular frameworks:

@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
+import type { Request } from 'express';
 
 export interface CreateBuildLogDto {
   siteId: string;
@@ -16,6 +18,9 @@ export interface CreateBuildLogDto {
   packageManager?: string;
   cacheHit?: boolean;
   outputDir?: string;
+  userId?: string;
+  userEmail?: string;
+  req?: Request;
 }
 
 export interface UpdateBuildLogDto {
@@ -30,13 +35,16 @@ export interface UpdateBuildLogDto {
 
 @Injectable()
 export class BuildLogsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   /**
    * Create a new build log entry
    */
   async create(data: CreateBuildLogDto) {
-    return this.prisma.buildLog.create({
+    const buildLog = await this.prisma.buildLog.create({
       data: {
         siteId: data.siteId,
         deployId: data.deployId,
@@ -54,13 +62,40 @@ export class BuildLogsService {
         outputDir: data.outputDir,
       },
     });
+
+    // Get site to fetch orgId for audit
+    const site = await this.prisma.site.findUnique({
+      where: { id: data.siteId },
+      select: { orgId: true },
+    });
+
+    // Record audit event for build started
+    if (site) {
+      await this.audit.record('build.started', {
+        orgId: site.orgId,
+        siteId: data.siteId,
+        deployId: data.deployId,
+        userId: data.userId,
+        userEmail: data.userEmail,
+        req: data.req,
+        meta: {
+          framework: data.framework,
+          command: data.command,
+          nodeVersion: data.nodeVersion,
+          packageManager: data.packageManager,
+          cacheHit: data.cacheHit,
+        },
+      });
+    }
+
+    return buildLog;
   }
 
   /**
    * Update a build log entry
    */
   async update(id: string, data: UpdateBuildLogDto) {
-    return this.prisma.buildLog.update({
+    const buildLog = await this.prisma.buildLog.update({
       where: { id },
       data: {
         status: data.status,
@@ -72,6 +107,42 @@ export class BuildLogsService {
         completedAt: data.completedAt,
       },
     });
+
+    // Get site to fetch orgId for audit
+    const site = await this.prisma.site.findUnique({
+      where: { id: buildLog.siteId },
+      select: { orgId: true },
+    });
+
+    // Record audit event for build completion or failure
+    if (site && data.status) {
+      if (data.status === 'success') {
+        await this.audit.record('build.completed', {
+          orgId: site.orgId,
+          siteId: buildLog.siteId,
+          deployId: buildLog.deployId || undefined,
+          meta: {
+            framework: buildLog.framework,
+            exitCode: data.exitCode,
+            duration: data.duration,
+            outputDir: buildLog.outputDir,
+          },
+        });
+      } else if (data.status === 'failed') {
+        await this.audit.record('build.failed', {
+          orgId: site.orgId,
+          siteId: buildLog.siteId,
+          deployId: buildLog.deployId || undefined,
+          meta: {
+            framework: buildLog.framework,
+            exitCode: data.exitCode,
+            duration: data.duration,
+          },
+        });
+      }
+    }
+
+    return buildLog;
   }
 
   /**

@@ -50,23 +50,23 @@
                 v-model="filterAction"
                 class="w-full bg-gray-500/10 hover:bg-gray-500/15 border border-gray-500/25 hover:border-gray-500/40 text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300/50 focus:border-blue-300/50 transition-all appearance-none cursor-pointer"
               >
-                <option value="">All Actions</option>
-                <optgroup label="Builds">
-                  <option value="build">Build Events</option>
-                  <option value="build.success">Build Success</option>
-                  <option value="build.failed">Build Failed</option>
-                </optgroup>
-                <optgroup label="Deployments">
-                  <option value="deploy.created">Deploy Created</option>
-                  <option value="deploy.finalized">Deploy Finalized</option>
-                  <option value="deploy.activated">Deploy Activated</option>
-                  <option value="deploy.rollback">Deploy Rollback</option>
-                  <option value="deploy.deleted">Deploy Deleted</option>
-                </optgroup>
-                <optgroup label="Sites">
-                  <option value="site.created">Site Created</option>
-                  <option value="site.deleted">Site Deleted</option>
-                </optgroup>
+              <option value="">All Actions</option>
+              <optgroup label="Builds">
+                <option value="build.started">Build Started</option>
+                <option value="build.completed">Build Completed</option>
+                <option value="build.failed">Build Failed</option>
+              </optgroup>
+              <optgroup label="Deployments">
+                <option value="deploy.created">Deploy Created</option>
+                <option value="deploy.finalized">Deploy Finalized</option>
+                <option value="deploy.activated">Deploy Activated</option>
+                <option value="deploy.rollback">Deploy Rollback</option>
+                <option value="deploy.deleted">Deploy Deleted</option>
+              </optgroup>
+              <optgroup label="Sites">
+                <option value="site.created">Site Created</option>
+                <option value="site.deleted">Site Deleted</option>
+              </optgroup>
               </select>
               <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                 <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -167,6 +167,7 @@
                   <span class="text-gray-300 ml-1">{{ event.deployId.slice(0, 8) }}</span>
                 </div>
                 <button
+                  v-if="event.action === 'build.started' || event.action === 'build.completed' || event.action === 'build.failed'"
                   @click="downloadBuildLog(event.id)"
                   class="px-2.5 py-1 bg-blue-300/10 border border-blue-300/20 text-blue-300 hover:bg-blue-300/20 rounded-lg text-xs font-medium transition flex items-center gap-1.5"
                 >
@@ -414,6 +415,9 @@ const formatRelativeTime = (date: string | Date) => {
 
 const formatActionTitle = (action: string) => {
   const titles: Record<string, string> = {
+    'build.started': 'Build Started',
+    'build.completed': 'Build Completed',
+    'build.failed': 'Build Failed',
     'deploy.created': 'Deployment Created',
     'deploy.finalized': 'Deployment Finalized',
     'deploy.activated': 'Deployment Activated',
@@ -426,7 +430,13 @@ const formatActionTitle = (action: string) => {
 };
 
 const getActionBadgeClass = (action: string) => {
-  if (action.includes('created')) {
+  if (action.includes('build.completed')) {
+    return 'bg-green-300/10 border border-green-300/20 text-green-300';
+  } else if (action.includes('build.failed')) {
+    return 'bg-red-400/10 border border-red-400/20 text-red-400';
+  } else if (action.includes('build.started')) {
+    return 'bg-purple-300/10 border border-purple-300/20 text-purple-300';
+  } else if (action.includes('created')) {
     return 'bg-blue-300/10 border border-blue-300/20 text-blue-300';
   } else if (action.includes('activated')) {
     return 'bg-green-300/10 border border-green-300/20 text-green-300';
@@ -440,7 +450,13 @@ const getActionBadgeClass = (action: string) => {
 };
 
 const getActionIconClass = (action: string) => {
-  if (action.includes('created')) {
+  if (action.includes('build.completed')) {
+    return 'bg-green-300/10 border border-green-300/20 text-green-300';
+  } else if (action.includes('build.failed')) {
+    return 'bg-red-400/10 border border-red-400/20 text-red-400';
+  } else if (action.includes('build.started')) {
+    return 'bg-purple-300/10 border border-purple-300/20 text-purple-300';
+  } else if (action.includes('created')) {
     return 'bg-blue-300/10 border border-blue-300/20 text-blue-300';
   } else if (action.includes('activated')) {
     return 'bg-green-300/10 border border-green-300/20 text-green-300';
@@ -464,7 +480,10 @@ const getActionIcon = (action: string) => {
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
       'stroke-width': '2',
-      d: action.includes('created') ? 'M12 4v16m8-8H4' :
+      d: action.includes('build.completed') ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' :
+         action.includes('build.failed') ? 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z' :
+         action.includes('build.started') ? 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' :
+         action.includes('created') ? 'M12 4v16m8-8H4' :
          action.includes('activated') ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' :
          action.includes('deleted') ? 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16' :
          action.includes('rollback') ? 'M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6' :
@@ -490,6 +509,26 @@ const formatMetaValue = (key: string, value: any): string => {
     if (value < 1000) return `${value}ms`;
     if (value < 60000) return `${(value / 1000).toFixed(1)}s`;
     return `${(value / 60000).toFixed(1)}m`;
+  }
+  
+  // Format framework
+  if (key === 'framework') {
+    return `${value}`;
+  }
+  
+  // Format command
+  if (key === 'command') {
+    return `${value}`;
+  }
+  
+  // Format exitCode
+  if (key === 'exitCode') {
+    return `Exit: ${value}`;
+  }
+  
+  // Format cacheHit
+  if (key === 'cacheHit') {
+    return value ? 'Cache Hit' : 'Cache Miss';
   }
   
   // Default: show key: value
@@ -523,3 +562,16 @@ const downloadBuildLog = async (buildLogId: string) => {
 };
 </script>
 
+<style scoped>
+/* Style the native date picker calendar icon to be white */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+</style>

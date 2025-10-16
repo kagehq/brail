@@ -136,8 +136,9 @@ body {
 }
 
 :global([data-sonner-toast]) {
-  min-width: 360px !important;
-  max-width: 420px !important;
+  min-width: 500px !important;
+  max-width: 800px !important;
+  width: max-content !important;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   word-wrap: break-word !important;
   display: flex !important;

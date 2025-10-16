@@ -32,7 +32,10 @@ export type AuditAction =
   | 'profile.updated'
   | 'profile.deleted'
   | 'release.promoted'
-  | 'release.rolled_back';
+  | 'release.rolled_back'
+  | 'build.started'
+  | 'build.completed'
+  | 'build.failed';
 
 /**
  * Audit event interface

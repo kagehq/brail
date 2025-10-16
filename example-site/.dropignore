@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Source files (Tailwind input)
+src/
+
+# Build config
+tailwind.config.js
+
+# Development
+.git/
+.DS_Store
+*.log
+

@@ -473,6 +473,7 @@
 <script setup lang="ts">
 import type { Site, Deploy } from '@br/shared';
 import { formatBytes } from '@br/shared';
+import { toast as sonnerToast } from 'vue-sonner';
 
 const route = useRoute();
 const router = useRouter();
@@ -749,16 +750,22 @@ const activateDeploy = (deployId: string) => {
 const executeActivateDeploy = async (deployId: string) => {
   const toast = useToast();
   activating.value = deployId;
-  const toastId = toast.loading('Activating deployment...');
+  const toastId = sonnerToast.loading('Activating deployment...');
   
   try {
     await api.activateDeploy(deployId);
     await Promise.all([loadSite(), loadDeploys(), loadReleases()]);
     celebrate(); // 🎊 Celebration!
-    toast.success('Deployment Activated', 'Your deployment is now live!');
+    sonnerToast.success('Deployment Activated', {
+      id: toastId,
+      description: 'Your deployment is now live!'
+    });
   } catch (error: any) {
     console.error('Failed to activate deploy:', error);
-    toast.apiError(error);
+    sonnerToast.error('Activation Failed', {
+      id: toastId,
+      description: error.message || 'Failed to activate deployment'
+    });
   } finally {
     activating.value = null;
   }
@@ -779,18 +786,23 @@ const deleteDeploy = (deployId: string) => {
 };
 
 const executeDeleteDeploy = async (deployId: string) => {
-  const toast = useToast();
-  const toastId = toast.loading('Deleting deployment...');
+  const toastId = sonnerToast.loading('Deleting deployment...');
   
   try {
     await api.fetch(`/v1/deploys/${deployId}`, {
       method: 'DELETE',
     });
     await loadDeploys();
-    toast.success('Deployment Deleted', 'The deployment has been removed.');
+    sonnerToast.success('Deployment Deleted', {
+      id: toastId,
+      description: 'The deployment has been removed.'
+    });
   } catch (error: any) {
     console.error('Failed to delete deploy:', error);
-    toast.apiError(error);
+    sonnerToast.error('Delete Failed', {
+      id: toastId,
+      description: error.message || 'Failed to delete deployment'
+    });
   }
 };
 
@@ -809,7 +821,6 @@ const deleteSite = () => {
 };
 
 const executeDeleteSite = async () => {
-  const { toast: sonnerToast } = await import('vue-sonner');
   const toastId = sonnerToast.loading('Deleting site...');
   
   try {
@@ -831,7 +842,6 @@ const executeDeleteSite = async () => {
 };
 
 const exportData = async () => {
-  const { toast: sonnerToast } = await import('vue-sonner');
   const toastId = sonnerToast.loading('Preparing export...');
   
   try {

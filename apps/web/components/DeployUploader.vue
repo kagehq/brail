@@ -223,6 +223,7 @@
 
 <script setup lang="ts">
 import { formatBytes } from '@br/shared';
+import { toast as sonnerToast } from 'vue-sonner';
 
 const props = defineProps<{
   siteId: string;
@@ -375,6 +376,37 @@ const handleFiles = (e: Event) => {
   }
 };
 
+/**
+ * Check if a file should be ignored based on .dropignore patterns
+ */
+const shouldIgnoreFile = (filePath: string, patterns: string[]): boolean => {
+  for (const pattern of patterns) {
+    // Handle directory patterns (ending with /)
+    if (pattern.endsWith('/')) {
+      const dir = pattern.slice(0, -1);
+      if (filePath.startsWith(dir + '/') || filePath === dir) {
+        return true;
+      }
+    }
+    // Handle exact matches
+    else if (filePath === pattern) {
+      return true;
+    }
+    // Handle wildcard patterns
+    else if (pattern.includes('*')) {
+      const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+      if (regex.test(filePath)) {
+        return true;
+      }
+    }
+    // Handle files within directories
+    else if (filePath.startsWith(pattern + '/')) {
+      return true;
+    }
+  }
+  return false;
+};
+
 const processFileList = async (fileList: File[]) => {
   // Create deploy
   const deploy = await api.createDeploy(props.siteId);
@@ -391,12 +423,36 @@ const processFileList = async (fileList: File[]) => {
     basePath = parts[0];
   }
   
+  // Check for .dropignore file
+  let ignorePatterns: string[] = [];
+  const dropignoreFile = fileList.find(f => {
+    const path = f.webkitRelativePath || f.name;
+    return path.endsWith('.dropignore') || path.endsWith('/.dropignore');
+  });
+  
+  if (dropignoreFile) {
+    try {
+      const ignoreContent = await dropignoreFile.text();
+      ignorePatterns = ignoreContent
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('#'));
+    } catch (e) {
+      console.warn('Failed to read .dropignore:', e);
+    }
+  }
+  
   for (const file of fileList) {
     let relativePath = file.webkitRelativePath || file.name;
     
     // Remove base directory from path
     if (basePath && relativePath.startsWith(basePath + '/')) {
       relativePath = relativePath.substring(basePath.length + 1);
+    }
+    
+    // Skip files matching .dropignore patterns
+    if (shouldIgnoreFile(relativePath, ignorePatterns)) {
+      continue;
     }
     
     fileUploads.push({
@@ -414,9 +470,92 @@ const processFileList = async (fileList: File[]) => {
 };
 
 const processEntries = async (entries: any[]) => {
-  // Simplified for drag & drop - similar to processFileList
-  // In production, you'd recursively read directory entries
-  console.warn('Drag & drop support is simplified - use folder select button');
+  // Create deploy
+  const deploy = await api.createDeploy(props.siteId);
+  currentDeploy.value = deploy.deployId;
+  emit('deployCreated', deploy.deployId);
+  
+  const fileUploads: FileUpload[] = [];
+  const allFiles: { file: File; path: string }[] = [];
+  
+  // Recursively read all entries
+  const readEntry = async (entry: any, basePath = ''): Promise<void> => {
+    if (entry.isFile) {
+      return new Promise((resolve) => {
+        entry.file((file: File) => {
+          const fullPath = basePath ? `${basePath}/${entry.name}` : entry.name;
+          allFiles.push({ file, path: fullPath });
+          resolve();
+        });
+      });
+    } else if (entry.isDirectory) {
+      const dirReader = entry.createReader();
+      return new Promise((resolve) => {
+        dirReader.readEntries(async (entries: any[]) => {
+          const dirPath = basePath ? `${basePath}/${entry.name}` : entry.name;
+          for (const childEntry of entries) {
+            await readEntry(childEntry, dirPath);
+          }
+          resolve();
+        });
+      });
+    }
+  };
+  
+  // Read all entries first
+  for (const entry of entries) {
+    await readEntry(entry);
+  }
+  
+  // Check for .dropignore file
+  let ignorePatterns: string[] = [];
+  const dropignoreFile = allFiles.find(f => f.path.endsWith('.dropignore') || f.path === '.dropignore');
+  
+  if (dropignoreFile) {
+    try {
+      const ignoreContent = await dropignoreFile.file.text();
+      ignorePatterns = ignoreContent
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('#'));
+    } catch (e) {
+      console.warn('Failed to read .dropignore:', e);
+    }
+  }
+  
+  // Determine base path (first directory dropped)
+  let basePath = '';
+  if (allFiles.length > 0 && allFiles[0].path.includes('/')) {
+    const parts = allFiles[0].path.split('/');
+    basePath = parts[0];
+  }
+  
+  // Filter files based on .dropignore and remove base path
+  for (const { file, path } of allFiles) {
+    let relativePath = path;
+    
+    // Remove base directory from path
+    if (basePath && relativePath.startsWith(basePath + '/')) {
+      relativePath = relativePath.substring(basePath.length + 1);
+    }
+    
+    // Skip files matching .dropignore patterns
+    if (shouldIgnoreFile(relativePath, ignorePatterns)) {
+      continue;
+    }
+    
+    fileUploads.push({
+      path: relativePath,
+      file,
+      size: file.size,
+      progress: 0,
+    });
+  }
+  
+  files.value = fileUploads;
+  
+  // Start uploads
+  startUploads();
 };
 
 const startUploads = async () => {
@@ -485,18 +624,17 @@ const startUploads = async () => {
         xhr.send(formData);
       });
     } catch (error: any) {
-      const toast = useToast();
       console.error('Upload error:', error);
       fileUpload.error = error.message;
-      toast.error('Upload Failed', `Failed to upload ${fileUpload.path}: ${error.message}`);
+      sonnerToast.error('Upload Failed', {
+        description: `Failed to upload ${fileUpload.path}: ${error.message}`
+      });
     }
   }
   
   // Check if any files failed
   const failedFiles = files.value.filter(f => f.error);
   if (failedFiles.length > 0) {
-    const toast = useToast();
-    
     // Mark deployment as failed on backend
     try {
       await fetch(`${config.public.apiUrl}/v1/deploys/${currentDeploy.value}/fail`, {
@@ -507,7 +645,9 @@ const startUploads = async () => {
       console.error('Failed to mark deployment as failed:', error);
     }
     
-    toast.error('Upload Failed', `${failedFiles.length} file(s) failed to upload. The deployment has been marked as failed.`);
+    sonnerToast.error('Upload Failed', {
+      description: `${failedFiles.length} file(s) failed to upload. The deployment has been marked as failed.`
+    });
     
     // Emit completion anyway so UI updates
     if (currentDeploy.value) {
@@ -525,7 +665,6 @@ const startUploads = async () => {
 const finalizeDeploy = async () => {
   if (!currentDeploy.value) return;
   
-  const toast = useToast();
   finalizing.value = true;
   
   try {
@@ -557,10 +696,14 @@ const finalizeDeploy = async () => {
           }),
         });
         
-        toast.success('Deploy Successful!', 'Your site is now live on your infrastructure.');
+        sonnerToast.success('Deploy Successful!', {
+          description: 'Your site is now live on your infrastructure.'
+        });
       } catch (error: any) {
         console.error('Failed to deploy to destination:', error);
-        toast.error('Deploy to Destination Failed', `${error.message}\n\nYour files are safely stored in Phase 0 storage.`);
+        sonnerToast.error('Deploy to Destination Failed', {
+          description: `${error.message}\n\nYour files are safely stored in Phase 0 storage.`
+        });
       }
     }
     
@@ -573,7 +716,9 @@ const finalizeDeploy = async () => {
     deploymentNotes.value = '';
   } catch (error: any) {
     console.error('Failed to finalize deploy:', error);
-    toast.error('Finalization Failed', error.message || 'Failed to finalize deployment');
+    sonnerToast.error('Finalization Failed', {
+      description: error.message || 'Failed to finalize deployment'
+    });
   } finally {
     finalizing.value = false;
     activating.value = false;
@@ -581,8 +726,6 @@ const finalizeDeploy = async () => {
 };
 
 const cancelUpload = async () => {
-  const toast = useToast();
-  
   // Mark deployment as failed in the backend
   if (currentDeploy.value) {
     try {
@@ -604,7 +747,9 @@ const cancelUpload = async () => {
   deploymentNotes.value = '';
   selectedProfile.value = null;
   
-  toast.info('Upload Cancelled', 'The deployment has been cancelled.');
+  sonnerToast.info('Upload Cancelled', {
+    description: 'The deployment has been cancelled.'
+  });
 };
 </script>
 

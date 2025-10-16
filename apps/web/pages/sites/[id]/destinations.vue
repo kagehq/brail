@@ -259,7 +259,7 @@
             <h3 class="text-2xl font-bold mb-2 text-white">Add Connection Profile</h3>
             <p class="text-gray-400 text-sm mb-6">Configure a deployment destination for your site</p>
         
-        <form @submit.prevent="handleCreate" class="space-y-4">
+        <form @submit.prevent="handleCreate" class="space-y-4" autocomplete="off">
           <div>
             <label class="block text-sm font-semibold text-gray-300 mb-2">
               Profile Name
@@ -268,6 +268,7 @@
               v-model="newProfile.name"
               type="text"
               required
+              autocomplete="off"
               class="w-full px-4 py-3 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg focus:ring-2 focus:ring-blue-300/50 focus:border-blue-300/50 transition-all placeholder:text-gray-600"
               placeholder="production"
             />
@@ -428,6 +429,7 @@
                 v-model="newProfile.config.secretAccessKey"
                 type="password"
                 required
+                autocomplete="new-password"
                 class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
               />
             </div>
@@ -488,6 +490,7 @@
                   v-model="newProfile.config.ftpPassword"
                   type="password"
                   required
+                  autocomplete="new-password"
                   class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
                 />
               </div>
@@ -533,6 +536,7 @@
                 v-model="newProfile.config.githubToken"
                 type="password"
                 required
+                autocomplete="new-password"
                 class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
                 placeholder="ghp_..."
               />
@@ -584,6 +588,7 @@
                 v-model="newProfile.config.netlifyToken"
                 type="password"
                 required
+                autocomplete="new-password"
                 class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
                 placeholder="nfp_..."
               />
@@ -622,6 +627,7 @@
                 v-model="newProfile.config.token"
                 type="password"
                 required
+                autocomplete="new-password"
                 class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
                 placeholder="vercel_..."
               />
@@ -683,6 +689,7 @@
                 v-model="newProfile.config.apiToken"
                 type="password"
                 required
+                autocomplete="new-password"
                 class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
               />
               <p class="text-xs text-gray-500 mt-1">Create at dash.cloudflare.com with Pages:Edit permissions</p>
@@ -721,6 +728,7 @@
                 v-model="newProfile.config.token"
                 type="password"
                 required
+                autocomplete="new-password"
                 class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
               />
             </div>
@@ -758,6 +766,7 @@
                 v-model="newProfile.config.accessToken"
                 type="password"
                 required
+                autocomplete="new-password"
                 class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
               />
               <p class="text-xs text-gray-500 mt-1">Get from fly.io/user/personal_access_tokens</p>
