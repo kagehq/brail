@@ -61,10 +61,10 @@ try {
     author: '',
     license: 'MIT',
     peerDependencies: {
-      '@brailhq/adapter-kit': '^0.1.0',
+      '@brailhq/adapter-kit': '^0.0.3',
     },
     devDependencies: {
-      '@brailhq/adapter-kit': '^0.1.0',
+      '@brailhq/adapter-kit': '^0.0.3',
       '@types/node': '^20.10.0',
       'typescript': '^5.3.3',
     },
