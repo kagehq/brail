@@ -10,6 +10,7 @@
 - Zero downtime deployments with instant rollbacks
 - Auto-detect and build Next.js, Astro, Vite, Nuxt, SvelteKit
 - Custom domains with DNS verification
+- **Automatic SSL certificates** via Let's Encrypt (HTTPS made easy)
 - Replace single files without full redeploy
 - Watch mode for auto-deploy on save
 - Drag & drop UI + powerful CLI
