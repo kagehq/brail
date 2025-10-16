@@ -1,6 +1,6 @@
 {
-  "name": "@br/adapter-kit",
-  "version": "0.1.0",
+  "name": "@brailhq/adapter-kit",
+  "version": "0.0.1",
   "description": "Public SDK for building Brail deployment adapters",
   "type": "module",
   "main": "./dist/index.js",
@@ -11,19 +11,29 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kagehq/brail.git",
+    "directory": "packages/adapter-kit"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "brail",
     "adapter",
     "deployment",
-    "sdk"
+    "sdk",
+    "static-site"
   ],
-  "author": "",
-  "license": "MIT",
+  "author": "Treadie, Inc.",
+  "license": "FSL-1.1-MIT",
   "devDependencies": {
     "@types/node": "^20.10.0",
     "typescript": "^5.3.3"

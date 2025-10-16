@@ -1,10 +1,18 @@
 {
   "name": "create-br-adapter",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Scaffold a new Brail deployment adapter",
   "type": "module",
   "bin": {
     "create-br-adapter": "./bin/create-br-adapter.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kagehq/brail.git",
+    "directory": "packages/create-br-adapter"
   },
   "scripts": {
     "build": "echo 'No build needed for scaffolder'"
@@ -13,10 +21,11 @@
     "brail",
     "adapter",
     "scaffold",
-    "cli"
+    "cli",
+    "static-site"
   ],
-  "author": "",
-  "license": "MIT",
+  "author": "Treadie, Inc.",
+  "license": "FSL-1.1-MIT",
   "dependencies": {
     "prompts": "^2.4.2",
     "chalk": "^5.3.0"
