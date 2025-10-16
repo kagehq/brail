@@ -67,6 +67,7 @@ model Site {
   connectionProfiles ConnectionProfile[]
   releases           Release[]
   buildLogs          BuildLog[]
+  envVars            EnvVar[]
 
   @@index([orgId])
 }
@@ -295,6 +296,32 @@ model BuildCache {
   meta         Json?
 
   @@index([siteId, lockHash])
+}
+
+// ============================================================================
+// Environment Variables
+// ============================================================================
+
+model EnvVar {
+  id        String   @id @default(cuid())
+  orgId     String
+  siteId    String
+  scope     String   // "build" | "runtime:preview" | "runtime:production" | "adapter:vercel" | "adapter:cloudflare" | "ssh-agent"
+  key       String
+  valueEnc  String   @db.Text // AES-256-GCM encrypted value
+  isSecret  Boolean  @default(true) // If false, value visible in UI without reveal
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, scope, key])
+  @@index([siteId])
+  @@index([siteId, scope])
+  @@index([orgId])
 }
 
 // ============================================================================

@@ -35,7 +35,10 @@ export type AuditAction =
   | 'release.rolled_back'
   | 'build.started'
   | 'build.completed'
-  | 'build.failed';
+  | 'build.failed'
+  | 'env.set'
+  | 'env.deleted'
+  | 'env.scope_deleted';
 
 /**
  * Audit event interface

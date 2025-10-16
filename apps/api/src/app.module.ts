@@ -20,6 +20,7 @@ import { AuditModule } from './audit/audit.module';
 import { BuildModule } from './build/build.module';
 import { BuildLogsModule } from './build-logs/build-logs.module';
 import { SslModule } from './ssl/ssl.module';
+import { EnvModule } from './env/env.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { SslModule } from './ssl/ssl.module';
     BuildModule,
     BuildLogsModule,
     SslModule,
+    EnvModule,
     PublicModule,
   ],
 })
