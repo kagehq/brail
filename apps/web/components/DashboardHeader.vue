@@ -57,6 +57,17 @@
               Domains
             </NuxtLink>
             <NuxtLink
+              :to="`/sites/${siteId}/env`"
+              :class="[
+                'text-sm transition',
+                activeTab === 'env' 
+                  ? 'text-white bg-gray-500/20 border border-gray-500/15 rounded-lg px-2.5 py-1 font-medium' 
+                  : 'text-gray-400 hover:text-white'
+              ]"
+            >
+              Environment
+            </NuxtLink>
+            <NuxtLink
               :to="`/sites/${siteId}/activity`"
               :class="[
                 'text-sm transition',
@@ -84,7 +95,7 @@
 interface Props {
   userEmail?: string;
   siteId?: string;
-  activeTab?: 'overview' | 'files' | 'destinations' | 'domains' | 'activity';
+  activeTab?: 'overview' | 'files' | 'destinations' | 'domains' | 'env' | 'activity';
 }
 
 defineProps<Props>();
