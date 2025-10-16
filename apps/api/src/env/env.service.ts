@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { encryptValue, decryptValue, getEncryptionKey } from '@br/shared/src/crypto';
+import { encryptValue, decryptValue, getEncryptionKey } from '@br/shared/src/crypto.js';
 
 const VALID_SCOPES = [
   'build',
