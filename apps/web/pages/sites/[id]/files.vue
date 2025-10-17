@@ -228,7 +228,7 @@
         
         <div class="mb-4">
           <div class="text-sm text-gray-400 mb-2">File to replace:</div>
-          <div class="text-white font-medium">{{ replaceDialog.file?.path }}</div>
+          <div class="text-white font-medium font-mono bg-gray-500/10 p-2 border border-gray-500/10 rounded-lg">{{ replaceDialog.file?.path }}</div>
         </div>
         
         <div class="mb-4">
@@ -240,9 +240,9 @@
             @change="handleFileSelect"
             class="block w-full text-sm text-gray-400
               file:mr-4 file:py-2 file:px-4
-              file:rounded file:border-0
+              file:rounded-lg file:border
               file:text-sm file:font-semibold
-              file:bg-blue-300/5 file:text-blue-300
+              file:bg-blue-300/5 file:border-blue-300/10 file:text-blue-300
               hover:file:bg-blue-300/10 file:cursor-pointer
               cursor-pointer"
           />
@@ -253,7 +253,7 @@
             <input
               v-model="replaceDialog.activate"
               type="checkbox"
-              class="rounded border-gray-500/25 bg-black text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+              class="rounded border-gray-500/25 bg-black text-blue-300 focus:ring-blue-300 focus:ring-offset-0"
             />
             Activate immediately
           </label>
@@ -263,14 +263,14 @@
           <button
             @click="performReplace"
             :disabled="!replaceDialog.selectedFile || replaceDialog.uploading"
-            class="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded font-medium transition"
+            class="flex-1 px-4 py-2 text-sm bg-blue-300 hover:bg-blue-400 disabled:bg-gray-500/40 disabled:text-gray-400 text-black rounded font-medium transition"
           >
             {{ replaceDialog.uploading ? 'Replacing...' : 'Replace' }}
           </button>
           <button
             @click="replaceDialog.show = false"
             :disabled="replaceDialog.uploading"
-            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition"
+            class="px-4 py-2 bg-gray-500/10 font-medium text-sm border border-gray-500/10 hover:bg-gray-500/15 text-white rounded-lg transition"
           >
             Cancel
           </button>
@@ -289,7 +289,7 @@
         
         <div class="mb-4">
           <div class="text-sm text-gray-400 mb-2">Are you sure you want to delete:</div>
-          <div class="text-white font-medium">{{ deleteDialog.file?.path }}</div>
+          <div class="text-white font-medium font-mono bg-gray-500/10 p-2 border border-gray-500/10 rounded-lg">{{ deleteDialog.file?.path }}</div>
         </div>
         
         <div class="mb-6">
@@ -297,7 +297,7 @@
             <input
               v-model="deleteDialog.activate"
               type="checkbox"
-              class="rounded border-gray-500/25 bg-black text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+              class="rounded border-gray-500/25 bg-black text-blue-300 focus:ring-blue-300 focus:ring-offset-0"
             />
             Activate immediately
           </label>
@@ -307,14 +307,14 @@
           <button
             @click="performDelete"
             :disabled="deleteDialog.deleting"
-            class="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded font-medium transition"
+            class="flex-1 px-4 py-2 bg-red-500 hover:bg-red-400 disabled:bg-gray-500/40 disabled:text-gray-400 text-white rounded font-medium transition"
           >
             {{ deleteDialog.deleting ? 'Deleting...' : 'Delete' }}
           </button>
           <button
             @click="deleteDialog.show = false"
             :disabled="deleteDialog.deleting"
-            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition"
+            class="px-4 py-2 bg-gray-500/10 font-medium text-sm border border-gray-500/10 hover:bg-gray-500/15 text-white rounded-lg transition"
           >
             Cancel
           </button>
