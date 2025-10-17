@@ -1,6 +1,5 @@
-import { readFile, readdir, writeFile, mkdir } from 'fs/promises';
+import { readFile, readdir, writeFile } from 'fs/promises';
 import { join, relative } from 'path';
-import { createHash } from 'crypto';
 import type {
   DeployAdapter,
   AdapterContext,
@@ -38,9 +37,11 @@ export class VercelAdapter implements DeployAdapter {
     input: UploadInput,
   ): Promise<{ destinationRef?: string; platformDeploymentId?: string; previewUrl?: string }> {
     const config = input.config as any;
-    const { deployId, filesDir, site } = input;
+    const { deployId, filesDir, site, target: requestedTarget } = input;
+    const target = requestedTarget === 'production' ? 'production' : 'staging';
 
     ctx.logger.info('[Vercel] Starting deployment...');
+    ctx.logger.info(`[Vercel] Requested target: ${requestedTarget || 'preview'} -> using Vercel target "${target}"`);
 
     // Parse _drop.json and generate vercel.json if needed
     const dropConfig = await parseDropJson(filesDir);
@@ -53,16 +54,25 @@ export class VercelAdapter implements DeployAdapter {
       ctx.logger.info('[Vercel] Generated vercel.json from _drop.json');
     }
 
-    // Collect all files and compute hashes
+    // Collect all files and prepare payload for Vercel
     const files = await this.collectFiles(filesDir);
     ctx.logger.info(`[Vercel] Collected ${files.length} files`);
 
-    // Create file map with SHA256 hashes
-    const fileMap: Record<string, string> = {};
+    // Build deployment payload with base64-encoded content
+    const deploymentFiles: Array<{
+      file: string;
+      data: string;
+      encoding: 'base64';
+    }> = [];
+
     for (const file of files) {
       const content = await readFile(file.fullPath);
-      const hash = createHash('sha256').update(content).digest('hex');
-      fileMap[file.relativePath] = hash;
+
+      deploymentFiles.push({
+        file: file.relativePath,
+        data: content.toString('base64'),
+        encoding: 'base64',
+      });
     }
 
     // Determine project name
@@ -79,9 +89,8 @@ export class VercelAdapter implements DeployAdapter {
       ctx,
       config,
       projectName,
-      files,
-      fileMap,
-      filesDir,
+      deploymentFiles,
+      target,
     );
 
     ctx.logger.info(`[Vercel] Deployment created: ${deployment.id}`);
@@ -222,62 +231,64 @@ export class VercelAdapter implements DeployAdapter {
     ctx: AdapterContext,
     config: any,
     projectName: string,
-    files: Array<{ fullPath: string; relativePath: string }>,
-    fileMap: Record<string, string>,
-    filesDir: string,
+    deploymentFiles: Array<{
+      file: string;
+      data: string;
+      encoding: 'base64';
+    }>,
+    target: 'production' | 'staging',
   ): Promise<{ id: string; url: string }> {
     const headers = this.getHeaders(config);
 
-    // Step 1: Upload files that don't exist on Vercel
-    ctx.logger.info('[Vercel] Uploading files...');
-
-    for (const file of files) {
-      const hash = fileMap[file.relativePath];
-      const content = await readFile(file.fullPath);
-
-      // Upload file
-      const uploadUrl = `https://api.vercel.com/v2/now/files`;
-      const uploadHeaders = {
-        ...headers,
-        'Content-Type': 'application/octet-stream',
-        'x-vercel-digest': hash,
-      };
-
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: uploadHeaders,
-        body: content,
-      });
-
-      if (!uploadResponse.ok && uploadResponse.status !== 409) {
-        // 409 means file already exists, which is OK
-        throw new Error(`Failed to upload file ${file.relativePath}: ${uploadResponse.status}`);
-      }
+    ctx.logger.info('[Vercel] Preparing files for deployment...');
+    ctx.logger.info(`[Vercel] Prepared ${deploymentFiles.length} files for upload`);
+    ctx.logger.info(
+      `[Vercel] Files payload type: ${Array.isArray(deploymentFiles) ? 'array' : typeof deploymentFiles}`,
+    );
+    if (deploymentFiles.length > 0) {
+      const sample = deploymentFiles[0];
+      ctx.logger.info(
+        `[Vercel] Sample file payload keys: ${Object.keys(sample).join(', ')}`,
+      );
+      ctx.logger.info(
+        `[Vercel] Sample file payload values: file=${sample.file}, encoding=${sample.encoding}, dataLength=${sample.data.length}`,
+      );
     }
-
-    ctx.logger.info('[Vercel] Files uploaded');
 
     // Step 2: Create deployment
     ctx.logger.info('[Vercel] Creating deployment...');
 
-    const deployUrl = 'https://api.vercel.com/v13/deployments';
-    
+    const deployUrl = `https://api.vercel.com/v13/deployments`;
+
     const deploymentBody: any = {
       name: projectName,
-      files: files.map((file) => ({
-        file: file.relativePath,
-        sha: fileMap[file.relativePath],
-        size: 0, // Vercel doesn't strictly require this
-      })),
-      projectSettings: {
-        framework: config.framework || null,
-      },
-      target: 'preview', // Always create as preview first
+      target,
+      files: deploymentFiles,
     };
 
     if (config.teamId) {
       deploymentBody.teamId = config.teamId;
     }
+
+    if (config.projectId || projectName) {
+      deploymentBody.project = config.projectId || projectName;
+    }
+
+    const requestPreview = {
+      name: deploymentBody.name,
+      target: deploymentBody.target,
+      project: deploymentBody.project,
+      teamId: deploymentBody.teamId,
+      fileCount: deploymentFiles.length,
+      exampleFile: deploymentFiles[0]
+        ? {
+            file: deploymentFiles[0].file,
+            encoding: deploymentFiles[0].encoding,
+            dataLength: deploymentFiles[0].data.length,
+          }
+        : undefined,
+    };
+    ctx.logger.info(`[Vercel] Deployment body preview: ${JSON.stringify(requestPreview)}`);
 
     const deployResponse = await fetch(deployUrl, {
       method: 'POST',
@@ -364,5 +375,45 @@ export class VercelAdapter implements DeployAdapter {
     await scan(dir, dir);
     return files;
   }
-}
 
+  async delete(
+    ctx: AdapterContext,
+    input: {
+      deployId: string;
+      config: unknown;
+      site: { id: string; name: string };
+      platformDeploymentId?: string;
+    },
+  ): Promise<void> {
+    const config = input.config as any;
+    const { platformDeploymentId } = input;
+
+    if (!platformDeploymentId) {
+      ctx.logger.warn('[Vercel] No platform deployment ID provided, skipping Vercel cleanup');
+      return;
+    }
+
+    ctx.logger.info(`[Vercel] Deleting deployment ${platformDeploymentId}...`);
+
+    const headers = this.getHeaders(config);
+    const deleteUrl = `https://api.vercel.com/v13/deployments/${platformDeploymentId}`;
+
+    try {
+      const response = await fetch(deleteUrl, {
+        method: 'DELETE',
+        headers,
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        ctx.logger.warn(`[Vercel] Failed to delete deployment: ${response.status} ${error}`);
+        // Don't throw error - we still want to delete the release record
+      } else {
+        ctx.logger.info(`[Vercel] Successfully deleted deployment ${platformDeploymentId}`);
+      }
+    } catch (error) {
+      ctx.logger.warn(`[Vercel] Error deleting deployment: ${error}`);
+      // Don't throw error - we still want to delete the release record
+    }
+  }
+}

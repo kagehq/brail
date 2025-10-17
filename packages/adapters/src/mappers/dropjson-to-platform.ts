@@ -1,27 +1,107 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
-/**
- * Parsed _drop.json configuration
- */
-export interface DropJsonConfig {
-  redirects?: Array<{
-    source: string;
-    destination: string;
-    statusCode?: number;
-  }>;
-  headers?: Array<{
-    source: string;
-    headers: Array<{
-      key: string;
-      value: string;
-    }>;
-  }>;
+export interface DropJsonHeaderConfig {
+  path: string;
+  set: Record<string, string>;
 }
 
-/**
- * Parse _drop.json from a files directory
- */
+export interface DropJsonRedirectConfig {
+  from: string;
+  to: string;
+  status?: number;
+}
+
+export interface DropJsonConfig {
+  redirects?: DropJsonRedirectConfig[];
+  headers?: DropJsonHeaderConfig[];
+}
+
+function expandBracePatterns(pattern: string): string[] {
+  const match = pattern.match(/\{([^{}]+)\}/);
+  if (!match) {
+    return [pattern];
+  }
+
+  const [token, body] = match;
+  const options = body.split(',').map((part) => part.trim()).filter(Boolean);
+
+  const results: string[] = [];
+  for (const option of options) {
+    const replaced = pattern.replace(token, option);
+    results.push(...expandBracePatterns(replaced));
+  }
+
+  return results;
+}
+
+function hasGlob(pattern: string): boolean {
+  return /[*?]/.test(pattern);
+}
+
+function convertGlobPattern(pattern: string, nextParam: () => string): string {
+  let result = '';
+
+  for (let i = 0; i < pattern.length; i += 1) {
+    const char = pattern[i];
+
+    if (char === '*') {
+      const isGlobStar = pattern[i + 1] === '*';
+      if (isGlobStar) {
+        const name = nextParam();
+        if (!result.endsWith('/')) {
+          result += '/';
+        }
+        result += `:${name}*`;
+        i += 1; // Skip the second *
+      } else {
+        const name = nextParam();
+        result += `:${name}`;
+      }
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result;
+}
+
+function removeCatchAllSegments(source: string): string | null {
+  if (!source.includes('*')) {
+    return null;
+  }
+
+  const cleaned = source.replace(/\/:([A-Za-z0-9_]+)\*/g, '');
+  const normalized = cleaned.replace(/\/\/+/, '/');
+  return normalized === '' ? '/' : normalized;
+}
+
+function convertPathToVercelSources(path: string, nextParam: () => string): string[] {
+  const variants = expandBracePatterns(path);
+  const sources = new Set<string>();
+
+  for (const variant of variants) {
+    const trimmed = variant.trim();
+    const normalized = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+
+    if (!hasGlob(normalized)) {
+      sources.add(normalized);
+      continue;
+    }
+
+    const converted = convertGlobPattern(normalized, nextParam);
+    sources.add(converted);
+
+    const withoutCatchAll = removeCatchAllSegments(converted);
+    if (withoutCatchAll && withoutCatchAll !== converted) {
+      sources.add(withoutCatchAll);
+    }
+  }
+
+  return Array.from(sources);
+}
+
 export async function parseDropJson(filesDir: string): Promise<DropJsonConfig | null> {
   try {
     const dropJsonPath = join(filesDir, '_drop.json');
@@ -29,134 +109,163 @@ export async function parseDropJson(filesDir: string): Promise<DropJsonConfig | 
     const parsed = JSON.parse(content);
     return parsed;
   } catch (error) {
-    // No _drop.json found, return null
     return null;
   }
 }
 
-/**
- * Convert _drop.json config to Vercel vercel.json format
- */
 export function toVercelConfig(drop: DropJsonConfig | null): any {
   if (!drop) {
     return {};
   }
 
   const vercelConfig: any = {};
+  const nextParamName = (() => {
+    let index = 0;
+    return () => `glob${++index}`;
+  })();
 
-  // Map redirects
-  if (drop.redirects && drop.redirects.length > 0) {
-    vercelConfig.redirects = drop.redirects.map((r) => ({
-      source: r.source,
-      destination: r.destination,
-      permanent: (r.statusCode || 301) === 301,
-      statusCode: r.statusCode || 301,
-    }));
+  if (Array.isArray(drop.redirects) && drop.redirects.length > 0) {
+    const redirects: Array<{ source: string; destination: string; permanent: boolean; statusCode: number }> = [];
+
+    for (const redirect of drop.redirects) {
+      if (!redirect.from || !redirect.to) {
+        continue;
+      }
+
+      const sources = convertPathToVercelSources(redirect.from, nextParamName);
+      for (const source of sources) {
+        const statusCode = redirect.status ?? 301;
+        const permanent = statusCode === 301 || statusCode === 308;
+        redirects.push({
+          source,
+          destination: redirect.to,
+          permanent,
+          statusCode,
+        });
+      }
+    }
+
+    if (redirects.length > 0) {
+      vercelConfig.redirects = redirects;
+    }
   }
 
-  // Map headers
-  if (drop.headers && drop.headers.length > 0) {
-    vercelConfig.headers = drop.headers.map((h) => ({
-      source: h.source,
-      headers: h.headers.map((hdr) => ({
-        key: hdr.key,
-        value: hdr.value,
-      })),
-    }));
+  if (Array.isArray(drop.headers) && drop.headers.length > 0) {
+    const headers: Array<{ source: string; headers: Array<{ key: string; value: string }> }> = [];
+
+    for (const header of drop.headers) {
+      if (!header.path || !header.set || Object.keys(header.set).length === 0) {
+        continue;
+      }
+
+      const sources = convertPathToVercelSources(header.path, nextParamName);
+      const headerPairs = Object.entries(header.set).map(([key, value]) => ({ key, value }));
+
+      for (const source of sources) {
+        headers.push({
+          source,
+          headers: headerPairs,
+        });
+      }
+    }
+
+    if (headers.length > 0) {
+      vercelConfig.headers = headers;
+    }
   }
 
   return vercelConfig;
 }
 
-/**
- * Convert _drop.json config to Cloudflare Pages _headers and _redirects file contents
- */
-export function toCloudflareFiles(drop: DropJsonConfig | null): {
-  _headers?: string;
-  _redirects?: string;
-} {
+export function toCloudflareFiles(drop: DropJsonConfig | null): { _headers?: string; _redirects?: string } {
   if (!drop) {
     return {};
   }
 
   const result: { _headers?: string; _redirects?: string } = {};
 
-  // Map headers to Cloudflare Pages _headers format
-  // Format: https://developers.cloudflare.com/pages/platform/headers/
-  if (drop.headers && drop.headers.length > 0) {
+  if (Array.isArray(drop.headers) && drop.headers.length > 0) {
     const headerLines: string[] = [];
 
     for (const headerGroup of drop.headers) {
-      headerLines.push(headerGroup.source);
-      for (const header of headerGroup.headers) {
-        headerLines.push(`  ${header.key}: ${header.value}`);
+      if (!headerGroup.path || !headerGroup.set) {
+        continue;
       }
-      headerLines.push(''); // blank line between sections
+
+      headerLines.push(headerGroup.path);
+      for (const [key, value] of Object.entries(headerGroup.set)) {
+        headerLines.push(`  ${key}: ${value}`);
+      }
+      headerLines.push('');
     }
 
-    result._headers = headerLines.join('\n');
+    if (headerLines.length > 0) {
+      result._headers = headerLines.join('\n');
+    }
   }
 
-  // Map redirects to Cloudflare Pages _redirects format
-  // Format: https://developers.cloudflare.com/pages/platform/redirects/
-  if (drop.redirects && drop.redirects.length > 0) {
+  if (Array.isArray(drop.redirects) && drop.redirects.length > 0) {
     const redirectLines: string[] = [];
 
     for (const redirect of drop.redirects) {
-      const statusCode = redirect.statusCode || 301;
-      redirectLines.push(
-        `${redirect.source} ${redirect.destination} ${statusCode}`,
-      );
+      if (!redirect.from || !redirect.to) {
+        continue;
+      }
+
+      const statusCode = redirect.status ?? 301;
+      redirectLines.push(`${redirect.from} ${redirect.to} ${statusCode}`);
     }
 
-    result._redirects = redirectLines.join('\n');
+    if (redirectLines.length > 0) {
+      result._redirects = redirectLines.join('\n');
+    }
   }
 
   return result;
 }
 
-/**
- * Convert _drop.json config to Netlify _headers and _redirects file contents
- */
-export function toNetlifyConfig(drop: DropJsonConfig | null): {
-  _headers?: string;
-  _redirects?: string;
-} {
+export function toNetlifyConfig(drop: DropJsonConfig | null): { _headers?: string; _redirects?: string } {
   if (!drop) {
     return {};
   }
 
   const result: { _headers?: string; _redirects?: string } = {};
 
-  // Map headers to Netlify _headers format
-  // Format: https://docs.netlify.com/routing/headers/
-  if (drop.headers && drop.headers.length > 0) {
+  if (Array.isArray(drop.headers) && drop.headers.length > 0) {
     const headerLines: string[] = [];
 
     for (const headerGroup of drop.headers) {
-      headerLines.push(headerGroup.source);
-      for (const header of headerGroup.headers) {
-        headerLines.push(`  ${header.key}: ${header.value}`);
+      if (!headerGroup.path || !headerGroup.set) {
+        continue;
       }
-      headerLines.push(''); // blank line between sections
+
+      headerLines.push(headerGroup.path);
+      for (const [key, value] of Object.entries(headerGroup.set)) {
+        headerLines.push(`  ${key}: ${value}`);
+      }
+      headerLines.push('');
     }
 
-    result._headers = headerLines.join('\n');
+    if (headerLines.length > 0) {
+      result._headers = headerLines.join('\n');
+    }
   }
 
-  // Map redirects to Netlify _redirects format
-  // Format: https://docs.netlify.com/routing/redirects/
-  if (drop.redirects && drop.redirects.length > 0) {
+  if (Array.isArray(drop.redirects) && drop.redirects.length > 0) {
     const redirectLines: string[] = [];
 
     for (const redirect of drop.redirects) {
-      const statusCode = redirect.statusCode || 301;
-      redirectLines.push(
-        `${redirect.source} ${redirect.destination} ${statusCode}`,
-      );
+      if (!redirect.from || !redirect.to) {
+        continue;
+      }
+
+      const statusCode = redirect.status ?? 301;
+      redirectLines.push(`${redirect.from} ${redirect.to} ${statusCode}`);
     }
 
-    result._redirects = redirectLines.join('\n');
+    if (redirectLines.length > 0) {
+      result._redirects = redirectLines.join('\n');
+    }
   }
 
   return result;
@@ -164,26 +273,18 @@ export function toNetlifyConfig(drop: DropJsonConfig | null): {
 
 /**
  * Example _drop.json structure for documentation:
- * 
+ *
  * {
  *   "redirects": [
- *     {
- *       "source": "/old-page",
- *       "destination": "/new-page",
- *       "statusCode": 301
- *     }
+ *     { "from": "/old-page", "to": "/new-page", "status": 301 }
  *   ],
  *   "headers": [
  *     {
- *       "source": "/(.*)",
- *       "headers": [
- *         {
- *           "key": "X-Frame-Options",
- *           "value": "DENY"
- *         }
- *       ]
+ *       "path": "/static/*.html",
+ *       "set": {
+ *         "cache-control": "no-store"
+ *       }
  *     }
  *   ]
  * }
  */
-

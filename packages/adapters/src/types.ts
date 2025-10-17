@@ -22,6 +22,7 @@ export interface UploadInput {
     id: string;
     name: string;
   };
+  target?: 'preview' | 'production';
 }
 
 /**
@@ -93,6 +94,17 @@ export interface DeployAdapter {
   /** Rollback to a previous deployment */
   rollback(ctx: AdapterContext, input: RollbackInput): Promise<void>;
 
+  /** Delete a deployment from the platform (optional) */
+  delete?(
+    ctx: AdapterContext,
+    input: {
+      deployId: string;
+      config: unknown;
+      site: { id: string; name: string };
+      platformDeploymentId?: string;
+    },
+  ): Promise<void>;
+
   /** List releases at destination (optional) */
   listReleases?(
     ctx: AdapterContext,
@@ -106,4 +118,3 @@ export interface DeployAdapter {
     keep: number,
   ): Promise<void>;
 }
-

@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@br/shared": "workspace:*",
+    "@brailhq/adapter-kit": "workspace:*",
     "@aws-sdk/client-s3": "^3.490.0",
     "ssh2": "^1.15.0",
     "glob": "^10.3.10",
