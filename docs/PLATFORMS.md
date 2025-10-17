@@ -1,27 +1,101 @@
 # Brail Platform Connectors
 
-This guide covers deploying to cloud platforms and services via Brail's adapters: **FTP**, **Vercel**, **Cloudflare Pages**, **Netlify**, **Railway** (beta), **Fly.io** (beta), and **GitHub Pages**.
+This guide covers deploying to cloud platforms and services via Brail's adapters: **SSH/Rsync**, **S3**, **FTP**, **Vercel**, **Cloudflare Pages**, **Netlify**, **Railway**, **Fly.io**, **GitHub Pages**, **Cloudflare Sandbox**, and **Vercel Sandbox**.
 
 ## Overview
 
-Brail's adapter system supports deploying to various platforms from traditional shared hosting to modern serverless platforms. These adapters handle:
+Brail's adapter system supports deploying to various platforms from traditional shared hosting to modern serverless platforms and dynamic sandbox environments. These adapters handle:
 
 - **Preview deployments**: Automatic preview URLs for testing (where supported)
 - **Production promotion**: One-click promotion from preview to production
 - **Rollback support**: Instant rollback to previous deployments
 - **Config mapping**: Automatic translation of `_drop.json` to platform-specific configs
 - **Traditional protocols**: FTP/FTPS support for shared hosting environments
+- **Dynamic sites**: Secure code execution with Cloudflare Sandbox and Vercel Sandbox
 
-## FTP Adapter
+## Static & Storage Adapters
+
+### SSH/Rsync Adapter
+
+Deploy to your own servers via SSH with rsync for efficient file transfers.
+
+#### Prerequisites
+
+1. **SSH access**: Server with SSH enabled
+2. **SSH key or password**: Authentication credentials
+3. **Target directory**: Remote path for deployment
+
+#### Configuration
+
+```bash
+# Add SSH profile
+br profiles add \
+  --site <siteId> \
+  --name production-server \
+  --adapter ssh-rsync \
+  --host server.example.com \
+  --user deploy \
+  --privateKey @~/.ssh/id_rsa \
+  --basePath /var/www/html
+```
+
+**Config Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `host` | ✅ | SSH server hostname |
+| `port` | ❌ | SSH port (default: 22) |
+| `user` | ✅ | SSH username |
+| `privateKey` | ✅ | SSH private key path |
+| `basePath` | ❌ | Remote deployment path |
+| `keepReleases` | ❌ | Number of releases to keep (default: 3) |
+
+### S3 Adapter
+
+Deploy to AWS S3, MinIO, or any S3-compatible storage service.
+
+#### Prerequisites
+
+1. **S3 bucket**: Create a bucket for your site
+2. **AWS credentials**: Access key ID and secret access key
+3. **Bucket permissions**: Read/write access configured
+
+#### Configuration
+
+```bash
+# Add S3 profile
+br profiles add \
+  --site <siteId> \
+  --name s3-production \
+  --adapter s3 \
+  --bucket my-website-bucket \
+  --region us-east-1 \
+  --accessKeyId <access-key> \
+  --secretAccessKey @~/.secrets/aws.secret
+```
+
+**Config Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `bucket` | ✅ | S3 bucket name |
+| `region` | ✅ | AWS region |
+| `accessKeyId` | ✅ | AWS access key ID |
+| `secretAccessKey` | ✅ | AWS secret access key |
+| `prefix` | ❌ | Key prefix for files |
+| `endpoint` | ❌ | Custom S3 endpoint (for MinIO) |
+| `forcePathStyle` | ❌ | Use path-style URLs |
+
+### FTP Adapter
 
 Deploy to traditional shared hosting environments via FTP or FTPS (secure FTP).
 
-### Prerequisites
+#### Prerequisites
 
 1. **FTP credentials**: Host, username, and password from your hosting provider
 2. **FTP access enabled**: Some hosts require enabling FTP in the control panel
 
-### Configuration
+#### Configuration
 
 ```bash
 # Add FTP profile
@@ -47,41 +121,19 @@ br profiles add \
 | `secure` | ❌ | Use FTPS (default: false) |
 | `keepReleases` | ❌ | Number of releases to keep (default: 3) |
 
-### Usage
+## Platform Adapters
 
-**Deploy:**
+### Vercel Adapter
 
-```bash
-br deploy --site my-site --profile shared-hosting
-```
+Deploy to Vercel platform with automatic preview URLs and production promotion.
 
-**Rollback:**
+#### Prerequisites
 
-```bash
-br rollback --site my-site --profile shared-hosting
-```
+1. **Vercel account**: Sign up at [vercel.com](https://vercel.com)
+2. **API token**: Generate from Vercel dashboard
+3. **Project setup**: Create or link existing project
 
-### Notes
-
-- FTP uploads can be slower than SSH/rsync for large files
-- FTPS provides encryption in transit (recommended for production)
-- Some shared hosts limit concurrent connections
-- Atomic deployments use symlink switching (if supported by host)
-
----
-
-## Vercel Adapter
-
-Deploy static sites and frameworks to Vercel with automatic preview URLs and production promotion.
-
-### Prerequisites
-
-1. **Vercel API Token**: Create at [vercel.com/account/tokens](https://vercel.com/account/tokens)
-   - Scopes needed: Deployments (Read & Write), Projects (Read & Write)
-
-2. **Team ID** (optional): Find in your Vercel dashboard URL (`vercel.com/teams/[TEAM_ID]`)
-
-### Configuration
+#### Configuration
 
 ```bash
 # Add Vercel profile
@@ -90,7 +142,8 @@ br profiles add \
   --name vercel-prod \
   --adapter vercel \
   --token @~/.secrets/vercel.token \
-  --projectName my-site
+  --projectName my-website \
+  --framework static
 ```
 
 **Config Fields:**
@@ -98,100 +151,32 @@ br profiles add \
 | Field | Required | Description |
 |-------|----------|-------------|
 | `token` | ✅ | Vercel API token |
-| `teamId` | ❌ | Team ID (for team deployments) |
-| `projectId` | ❌ | Existing project ID (auto-created if omitted) |
-| `projectName` | ❌ | Project name (defaults to site name) |
-| `framework` | ❌ | Framework hint: `static`, `nextjs`, `other` (default: `static`) |
+| `projectName` | ❌ | Vercel project name |
+| `teamId` | ❌ | Vercel team ID |
+| `framework` | ❌ | Framework type (static, nextjs, other) |
 | `productionDomain` | ❌ | Custom production domain |
 
-### Usage
+### Cloudflare Pages Adapter
 
-**Deploy to Preview:**
-```bash
-br drop ./dist --site abc123 --profile vercel-prod --target preview
-```
+Deploy to Cloudflare Pages with global edge distribution.
 
-**Deploy to Production:**
-```bash
-br drop ./dist --site abc123 --profile vercel-prod --target production
-```
+#### Prerequisites
 
-**Promote Preview to Production:**
-```bash
-br promote --site abc123 --to <deployId> --profile vercel-prod
-```
+1. **Cloudflare account**: Sign up at [cloudflare.com](https://cloudflare.com)
+2. **API token**: Generate with Pages:Edit permission
+3. **Account ID**: Found in Cloudflare dashboard
 
-### Config Mapping
-
-Brail automatically converts `_drop.json` to `vercel.json`:
-
-**_drop.json:**
-```json
-{
-  "redirects": [
-    { "source": "/old", "destination": "/new", "statusCode": 301 }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Frame-Options", "value": "DENY" }
-      ]
-    }
-  ]
-}
-```
-
-**Generated vercel.json:**
-```json
-{
-  "redirects": [
-    { "source": "/old", "destination": "/new", "permanent": true, "statusCode": 301 }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Frame-Options", "value": "DENY" }
-      ]
-    }
-  ]
-}
-```
-
-### Rollback
-
-```bash
-br rollback --site abc123 --to <oldDeployId> --profile vercel-prod
-```
-
-Vercel rollback promotes the specified deployment to production instantly.
-
----
-
-## Cloudflare Pages Adapter
-
-Deploy static sites to Cloudflare Pages with edge performance and automatic previews.
-
-### Prerequisites
-
-1. **Account ID**: Find in Cloudflare dashboard URL (`dash.cloudflare.com/<ACCOUNT_ID>`)
-
-2. **API Token**: Create at [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens)
-   - Template: **Edit Cloudflare Pages**
-   - Permissions: `Cloudflare Pages:Edit`
-
-### Configuration
+#### Configuration
 
 ```bash
 # Add Cloudflare Pages profile
 br profiles add \
   --site <siteId> \
-  --name pages-prod \
+  --name cf-pages \
   --adapter cloudflare-pages \
-  --accountId <accountId> \
+  --accountId <cf-account-id> \
   --apiToken @~/.secrets/cf.token \
-  --projectName my-site
+  --projectName my-website
 ```
 
 **Config Fields:**
@@ -199,234 +184,186 @@ br profiles add \
 | Field | Required | Description |
 |-------|----------|-------------|
 | `accountId` | ✅ | Cloudflare account ID |
-| `apiToken` | ✅ | Cloudflare API token with Pages:Edit permission |
-| `projectName` | ❌ | Project name (defaults to site name) |
-| `productionDomain` | ❌ | Custom domain (e.g., `mysite.pages.dev`) |
+| `apiToken` | ✅ | Cloudflare API token |
+| `projectName` | ❌ | Pages project name |
+| `productionDomain` | ❌ | Custom production domain |
 
-### Usage
+### Netlify Adapter
 
-**Deploy to Preview:**
-```bash
-br drop ./dist --site abc123 --profile pages-prod --target preview
-```
+Deploy to Netlify platform with automatic builds and preview URLs.
 
-**Promote to Production:**
-```bash
-br promote --site abc123 --to <deployId> --profile pages-prod
-```
+#### Prerequisites
 
-### Config Mapping
+1. **Netlify account**: Sign up at [netlify.com](https://netlify.com)
+2. **API token**: Generate from Netlify dashboard
+3. **Site setup**: Create or link existing site
 
-Brail converts `_drop.json` to Cloudflare Pages `_redirects` and `_headers` files:
-
-**_drop.json:**
-```json
-{
-  "redirects": [
-    { "source": "/old", "destination": "/new", "statusCode": 301 }
-  ],
-  "headers": [
-    {
-      "source": "/*",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=3600" }
-      ]
-    }
-  ]
-}
-```
-
-**Generated _redirects:**
-```
-/old /new 301
-```
-
-**Generated _headers:**
-```
-/*
-  Cache-Control: public, max-age=3600
-```
-
-### Rollback
+#### Configuration
 
 ```bash
-br rollback --site abc123 --to <oldDeployId> --profile pages-prod
-```
-
----
-
-## Netlify Adapter
-
-Deploy to Netlify with automatic preview deployments and production promotion.
-
-### Prerequisites
-
-1. **Netlify Personal Access Token**: Create at [app.netlify.com/user/applications](https://app.netlify.com/user/applications)
-   - Click "New access token" and copy the token
-
-2. **Site ID** (optional): Find in your Netlify site settings under "Site information" → "API ID"
-
-### Configuration
-
-```bash
-# Add Netlify profile (existing site)
+# Add Netlify profile
 br profiles add \
   --site <siteId> \
   --name netlify-prod \
   --adapter netlify \
   --token @~/.secrets/netlify.token \
-  --siteId xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  --siteId <netlify-site-id>
+```
 
-# Or create new site
+### Railway Adapter
+
+Deploy to Railway platform with containerized deployments.
+
+#### Prerequisites
+
+1. **Railway account**: Sign up at [railway.app](https://railway.app)
+2. **API token**: Generate from Railway dashboard
+3. **Project setup**: Create or link existing project
+
+#### Configuration
+
+```bash
+# Add Railway profile
 br profiles add \
   --site <siteId> \
-  --name netlify-new \
-  --adapter netlify \
-  --token @~/.secrets/netlify.token \
-  --siteName my-awesome-site
+  --name railway-prod \
+  --adapter railway \
+  --token @~/.secrets/railway.token \
+  --projectId <railway-project-id>
 ```
 
-**Config Fields:**
+### Fly.io Adapter
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `token` | ✅ | Netlify Personal Access Token |
-| `siteId` | ❌ | Existing site ID (auto-creates if omitted) |
-| `siteName` | ❌ | Site name for new sites (e.g., `my-site` → `my-site.netlify.app`) |
+Deploy to Fly.io platform with global edge deployment.
 
-### Usage
+#### Prerequisites
 
-**Deploy to Preview:**
+1. **Fly.io account**: Sign up at [fly.io](https://fly.io)
+2. **API token**: Generate from Fly.io dashboard
+3. **App setup**: Create or link existing app
+
+#### Configuration
+
 ```bash
-br drop ./dist --site abc123 --profile netlify-prod --target preview
+# Add Fly.io profile
+br profiles add \
+  --site <siteId> \
+  --name fly-prod \
+  --adapter fly \
+  --token @~/.secrets/fly.token \
+  --appName my-website
 ```
 
-**Promote to Production:**
-```bash
-br promote --site abc123 --to <deployId> --profile netlify-prod
-```
+### GitHub Pages Adapter
 
-**Rollback:**
-```bash
-br rollback --site abc123 --to <oldDeployId> --profile netlify-prod
-```
+Deploy to GitHub Pages with automatic builds from repository.
 
-### Notes
+#### Prerequisites
 
-- If no `siteId` is provided, Brail creates a new site automatically
-- Preview deployments get unique URLs like `https://deploy-preview-123--my-site.netlify.app`
-- Custom domains configured in Netlify dashboard are preserved
-- `_redirects` and `_headers` files are automatically handled by Netlify
+1. **GitHub repository**: Public or private repository
+2. **GitHub token**: Personal access token with repo permissions
+3. **Pages enabled**: Enable GitHub Pages in repository settings
 
----
-
-## GitHub Pages Adapter
-
-Deploy to GitHub Pages by pushing to a repository branch (typically `gh-pages`).
-
-### Prerequisites
-
-1. **GitHub Personal Access Token**: Create at [github.com/settings/tokens](https://github.com/settings/tokens)
-   - Click "Generate new token (classic)"
-   - Select scope: `repo` (Full control of private repositories)
-   - Copy the token
-
-2. **GitHub Repository**: Must exist and be accessible with the token
-   - Enable GitHub Pages in repo settings: Settings → Pages
-
-### Configuration
+#### Configuration
 
 ```bash
 # Add GitHub Pages profile
 br profiles add \
   --site <siteId> \
-  --name gh-pages-prod \
+  --name github-pages \
   --adapter github-pages \
   --token @~/.secrets/github.token \
-  --owner myusername \
-  --repo my-site \
-  --branch gh-pages
+  --repository owner/repo \
+  --branch main
+```
+
+## Dynamic & Server-side Adapters
+
+### Cloudflare Sandbox Adapter
+
+Deploy dynamic applications with secure code execution using Cloudflare Sandbox.
+
+#### Prerequisites
+
+1. **Cloudflare account**: Sign up at [cloudflare.com](https://cloudflare.com)
+2. **API token**: Generate with Workers:Edit permission
+3. **Account ID**: Found in Cloudflare dashboard
+
+#### Configuration
+
+```bash
+# Add Cloudflare Sandbox profile
+br profiles add \
+  --site <siteId> \
+  --name cf-sandbox \
+  --adapter cloudflare-sandbox \
+  --accountId <cf-account-id> \
+  --apiToken @~/.secrets/cf.token \
+  --runtime node \
+  --buildCommand "npm run build"
 ```
 
 **Config Fields:**
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `token` | ✅ | GitHub Personal Access Token with `repo` scope |
-| `owner` | ✅ | Repository owner (username or org) |
-| `repo` | ✅ | Repository name |
-| `branch` | ❌ | Target branch (default: `gh-pages`) |
+| `accountId` | ✅ | Cloudflare account ID |
+| `apiToken` | ✅ | Cloudflare API token |
+| `runtime` | ❌ | Runtime (node, python, deno) |
+| `buildCommand` | ❌ | Build command to run |
+| `memory` | ❌ | Memory limit in MB |
+| `timeout` | ❌ | Execution timeout in seconds |
 
-### Usage
+### Vercel Sandbox Adapter
 
-**Deploy:**
+Deploy dynamic applications with secure code execution using Vercel Sandbox.
+
+#### Prerequisites
+
+1. **Vercel account**: Sign up at [vercel.com](https://vercel.com)
+2. **API token**: Generate from Vercel dashboard
+3. **Team and project setup**: Create or link existing project
+
+#### Configuration
 
 ```bash
-br drop ./dist --site abc123 --profile gh-pages-prod
+# Add Vercel Sandbox profile
+br profiles add \
+  --site <siteId> \
+  --name vercel-sandbox \
+  --adapter vercel-sandbox \
+  --teamId <vercel-team-id> \
+  --projectId <vercel-project-id> \
+  --token @~/.secrets/vercel.token \
+  --runtime node22 \
+  --vcpus 4
 ```
 
-**Rollback:**
+**Config Fields:**
 
-```bash
-br rollback --site abc123 --to <oldDeployId> --profile gh-pages-prod
-```
-
-### Notes
-
-- Deployment creates a commit on the target branch with your files
-- GitHub Pages may take 1-2 minutes to build and publish after push
-- Custom domains configured via CNAME file are preserved
-- If the branch doesn't exist, Brail creates it automatically
-- The adapter uses force-push to ensure clean deploys (no merge conflicts)
-- Previous commits are preserved in git history for rollback support
-
----
-
-## Railway Adapter (Beta)
-
-⚠️ **Status: Beta / Stub**
-
-Railway support is planned for Phase 3. The adapter is currently scaffolded but not functional.
-
-**Planned Features:**
-- Deploy static sites via Railway services
-- Use Railway volumes or S3-compatible storage for assets
-- Automatic nginx/caddy container setup
-- Environment-based deployments
-
-**Feedback Welcome**: If you need Railway support, please open an issue describing your use case.
-
----
-
-## Fly.io Adapter (Beta)
-
-⚠️ **Status: Beta / Stub**
-
-Fly.io support is planned for Phase 3. The adapter is currently scaffolded but not functional.
-
-**Planned Features:**
-- Containerized static site deployment
-- Automatic Dockerfile generation (nginx/caddy)
-- Fly Machines API integration
-- Multi-region deployment support
-
-**Feedback Welcome**: If you need Fly.io support, please open an issue.
-
----
+| Field | Required | Description |
+|-------|----------|-------------|
+| `teamId` | ✅ | Vercel team ID |
+| `projectId` | ✅ | Vercel project ID |
+| `token` | ✅ | Vercel API token |
+| `runtime` | ❌ | Runtime (node22, python313) |
+| `vcpus` | ❌ | Number of vCPUs (1-4) |
+| `timeout` | ❌ | Execution timeout in minutes |
+| `ports` | ❌ | Exposed ports (comma-separated) |
 
 ## Comparison Table
 
-| Feature | Vercel | Cloudflare Pages | Railway | Fly.io |
-|---------|--------|------------------|---------|--------|
-| **Status** | ✅ GA | ✅ GA | ⚠️ Beta | ⚠️ Beta |
-| **Preview URLs** | ✅ | ✅ | 🚧 | 🚧 |
-| **Production Promotion** | ✅ | ✅ | 🚧 | 🚧 |
-| **Rollback** | ✅ | ✅ | 🚧 | 🚧 |
-| **Config Mapping** | ✅ vercel.json | ✅ _headers/_redirects | 🚧 | 🚧 |
-| **Custom Domains** | ✅ | ✅ | 🚧 | 🚧 |
-| **Edge Locations** | Global | Global | Regional | Multi-region |
-
----
+| Feature | Vercel | Cloudflare Pages | Railway | Fly.io | Cloudflare Sandbox | Vercel Sandbox |
+|---------|--------|------------------|---------|--------|-------------------|----------------|
+| **Status** | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA |
+| **Preview URLs** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Production Promotion** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Rollback** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Config Mapping** | ✅ vercel.json | ✅ _headers/_redirects | ✅ railway.json | ✅ fly.toml | ✅ wrangler.toml | ✅ vercel.json |
+| **Custom Domains** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Edge Locations** | Global | Global | Regional | Multi-region | Global | Global |
+| **Dynamic Code** | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| **Runtime Support** | Static | Static | Static | Static | Node/Python/Deno | Node22/Python313 |
 
 ## Common Patterns
 
@@ -468,7 +405,25 @@ br profiles add --site abc --name vercel-prod --adapter vercel \
   --token @~/.secrets/vercel-prod.token --projectName my-site-prod
 ```
 
----
+### Dynamic Site Deployment
+
+Deploy server-side applications with secure code execution:
+
+```bash
+# Cloudflare Sandbox
+br profiles add --site abc --name cf-sandbox --adapter cloudflare-sandbox \
+  --accountId <cf-account-id> --apiToken @~/.secrets/cf.token \
+  --runtime node --buildCommand "npm run build"
+
+br drop ./dist --site abc --profile cf-sandbox
+
+# Vercel Sandbox
+br profiles add --site abc --name vercel-sandbox --adapter vercel-sandbox \
+  --teamId <vercel-team-id> --projectId <vercel-project-id> \
+  --token @~/.secrets/vercel.token --runtime node22 --vcpus 4
+
+br drop ./dist --site abc --profile vercel-sandbox
+```
 
 ## Troubleshooting
 
@@ -484,20 +439,25 @@ br profiles add --site abc --name vercel-prod --adapter vercel \
 
 ### Preview URL not appearing
 
-- Ensure adapter is `vercel` or `cloudflare-pages` (other adapters may not support preview URLs yet)
+- Ensure adapter supports preview URLs (Vercel, Cloudflare Pages, Netlify, Railway, Fly.io)
 - Check API response in logs for error messages
+
+### Sandbox deployment issues
+
+- Verify runtime and build commands are correct
+- Check API tokens have appropriate permissions
+- Ensure source code is compatible with sandbox environment
 
 ---
 
 ## Next Steps
 
 - See [README.md](../README.md) for general Brail usage
-- Explore [Phase 1 adapters](../README.md#phase-1-adapter-based-releases) for SSH and S3 deployments
-- Check [_drop.json specification](../README.md#_dropjson-specification) for config options
+- Explore environment variables for build and runtime configuration
+- Check adapter-specific documentation for advanced features
 
 ---
 
 **Adapter Status**: 
-- ✅ **Production Ready**: FTP, Vercel, Cloudflare Pages, Netlify, GitHub Pages, SSH+rsync, S3
-- 🚧 **Beta**: Railway, Fly.io (coming in Phase 3)
-
+- ✅ **Production Ready**: SSH/Rsync, S3, FTP, Vercel, Cloudflare Pages, Netlify, Railway, Fly.io, GitHub Pages, Cloudflare Sandbox, Vercel Sandbox
+- 🚀 **Total Adapters**: 11 built-in adapters for all deployment scenarios

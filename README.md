@@ -2,7 +2,7 @@
 
 > Deploy static sites and dynamic applications anywhere with zero downtime and instant rollbacks.
 
-**Brail** is a modern filezilla that lets you push your site to your own servers, cloud storage, or platforms like Vercel and Cloudflare Pages. Full control, no vendor lock-in.
+**Brail** is a modern FileZilla that lets you push your site to your own servers, cloud storage, or platforms like Vercel and Cloudflare Pages. Full control, no vendor lock-in.
 
 ## Features
 
@@ -35,17 +35,19 @@ pnpm db:migrate
 pnpm dev
 ```
 
-Open http://localhost:3001 to use the web interface.
+Open <http://localhost:3001> to use the web interface.
 
 ## Deploy Your Site
 
 ### Web Interface (Recommended)
-1. Go to http://localhost:3001 and create a site
+
+1. Go to <http://localhost:3001> and create a site
 2. Drag your build folder into the upload zone
 3. Click "Finalize & Deploy"
 4. Your site is live at the preview URL
 
 ### CLI (Optional)
+
 ```bash
 # Install CLI globally
 cd apps/cli && pnpm build && pnpm link --global
@@ -58,7 +60,7 @@ br drop ./dist --site <siteId> --yes
 
 Create a `.dropignore` file to exclude files from deployment:
 
-```
+```text
 # .dropignore example
 node_modules/
 .git/
@@ -81,6 +83,7 @@ Manage environment variables through the web interface:
 ## Available Adapters
 
 **Static & Storage (7):**
+
 - **SSH/Rsync** - Deploy to your own servers via SSH
 - **FTP** - Upload to any FTP server
 - **S3** - AWS S3, MinIO, or S3-compatible storage
@@ -90,10 +93,12 @@ Manage environment variables through the web interface:
 - **GitHub Pages** - Deploy to GitHub Pages
 
 **Dynamic & Server-side (2):**
+
 - **Cloudflare Sandbox** - Edge computing with global distribution
 - **Vercel Sandbox** - Enterprise-grade sandbox with superior observability
 
 **Platforms (2):**
+
 - **Railway** - Deploy to Railway platform
 - **Fly.io** - Deploy to Fly.io platform
 
