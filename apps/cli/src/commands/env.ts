@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { getApiClient } from '../config';
+import { requireConfig } from '../config';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -79,18 +79,25 @@ export const envCommand = new Command('env')
       .option('--scope <scope>', `Scope to filter by (${SCOPE_CHOICES.slice(0, 3).join(', ')}, ...)`)
       .action(async (options) => {
         try {
-          const api = await getApiClient();
+          const config = await requireConfig();
           const params = options.scope ? `?scope=${options.scope}` : '';
-          const response = await api.get(`/v1/sites/${options.site}/env${params}`);
+          const response = await fetch(`${config.apiUrl}/v1/sites/${options.site}/env${params}`, {
+            headers: { Authorization: `Bearer ${config.token}` },
+          });
 
-          if (!response.data || response.data.length === 0) {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const data = await response.json() as any[];
+          if (!data || data.length === 0) {
             console.log('No environment variables found.');
             return;
           }
 
           // Group by scope
           const grouped: Record<string, any[]> = {};
-          for (const envVar of response.data) {
+          for (const envVar of data) {
             if (!grouped[envVar.scope]) {
               grouped[envVar.scope] = [];
             }
@@ -137,13 +144,24 @@ export const envCommand = new Command('env')
 
           const [, key, value] = match;
 
-          const api = await getApiClient();
-          await api.post(`/v1/sites/${options.site}/env`, {
-            scope: options.scope,
-            key,
-            value,
-            isSecret: !options.public,
+          const config = await requireConfig();
+          const response = await fetch(`${config.apiUrl}/v1/sites/${options.site}/env`, {
+            method: 'POST',
+            headers: { 
+              Authorization: `Bearer ${config.token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              scope: options.scope,
+              key,
+              value,
+              isSecret: !options.public,
+            }),
           });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
 
           const secretBadge = options.public ? '' : '🔒 ';
           console.log(`${secretBadge}Set ${options.scope}:${key}`);
@@ -188,13 +206,22 @@ export const envCommand = new Command('env')
             });
           }
 
-          const api = await getApiClient();
-          await api.delete(`/v1/sites/${options.site}/env`, {
-            data: {
+          const config = await requireConfig();
+          const response = await fetch(`${config.apiUrl}/v1/sites/${options.site}/env`, {
+            method: 'DELETE',
+            headers: { 
+              Authorization: `Bearer ${config.token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
               scope: options.scope,
               key,
-            },
+            }),
           });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
 
           console.log(`Deleted ${options.scope}:${key}`);
         } catch (error: any) {
@@ -251,14 +278,26 @@ export const envCommand = new Command('env')
             });
           }
 
-          const api = await getApiClient();
-          const response = await api.post(`/v1/sites/${options.site}/env/bulk`, {
-            scope: options.scope,
-            vars,
-            isSecret: !options.public,
+          const config = await requireConfig();
+          const response = await fetch(`${config.apiUrl}/v1/sites/${options.site}/env/bulk`, {
+            method: 'POST',
+            headers: { 
+              Authorization: `Bearer ${config.token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              scope: options.scope,
+              vars,
+              isSecret: !options.public,
+            }),
           });
 
-          console.log(`✓ Imported ${response.data.count} variables to ${options.scope}`);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const data = await response.json() as { count: number };
+          console.log(`✓ Imported ${data.count} variables to ${options.scope}`);
         } catch (error: any) {
           console.error('Failed to import environment variables:', error.response?.data?.message || error.message);
           process.exit(1);
@@ -273,10 +312,16 @@ export const envCommand = new Command('env')
       .option('--output <file>', 'Output file (default: stdout)')
       .action(async (options) => {
         try {
-          const api = await getApiClient();
-          const response = await api.get(`/v1/sites/${options.site}/env/export?scope=${options.scope}`);
+          const config = await requireConfig();
+          const response = await fetch(`${config.apiUrl}/v1/sites/${options.site}/env/export?scope=${options.scope}`, {
+            headers: { Authorization: `Bearer ${config.token}` },
+          });
 
-          const vars = response.data;
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const vars = await response.json() as Record<string, string>;
           const content = formatEnvFile(vars);
 
           if (options.output) {
@@ -300,10 +345,17 @@ export const envCommand = new Command('env')
       .requiredOption('--scope <scope>', 'Variable scope')
       .action(async (key: string, options) => {
         try {
-          const api = await getApiClient();
-          const response = await api.get(`/v1/sites/${options.site}/env/${options.scope}/${key}/reveal`);
+          const config = await requireConfig();
+          const response = await fetch(`${config.apiUrl}/v1/sites/${options.site}/env/${options.scope}/${key}/reveal`, {
+            headers: { Authorization: `Bearer ${config.token}` },
+          });
 
-          console.log(response.data.value);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const data = await response.json() as { value: string };
+          console.log(data.value);
         } catch (error: any) {
           console.error('Failed to reveal environment variable:', error.response?.data?.message || error.message);
           process.exit(1);

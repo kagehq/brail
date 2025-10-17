@@ -120,7 +120,7 @@ export class BuildLogsService {
         await this.audit.record('build.completed', {
           orgId: site.orgId,
           siteId: buildLog.siteId,
-          deployId: buildLog.deployId || undefined,
+          deployId: buildLog.deployId ?? undefined,
           meta: {
             framework: buildLog.framework,
             exitCode: data.exitCode,
@@ -132,7 +132,7 @@ export class BuildLogsService {
         await this.audit.record('build.failed', {
           orgId: site.orgId,
           siteId: buildLog.siteId,
-          deployId: buildLog.deployId || undefined,
+          deployId: buildLog.deployId ?? undefined,
           meta: {
             framework: buildLog.framework,
             exitCode: data.exitCode,

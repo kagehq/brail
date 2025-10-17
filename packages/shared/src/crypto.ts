@@ -102,6 +102,7 @@ export function maskSecrets(config: any): any {
     'secretAccessKey',
     'password',
     'token',
+    'apiToken',
     'apiKey',
     'secret',
   ];
@@ -237,4 +238,3 @@ export function getEncryptionKey(): Buffer {
 
   return keyBuffer;
 }
-

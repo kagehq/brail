@@ -32,6 +32,7 @@ export interface UploadInput {
   filesDir: string;
   config: unknown;
   site: Site;
+  target?: 'preview' | 'production';
 }
 
 export interface ActivateInput {
@@ -223,4 +224,3 @@ export async function retry<T>(
 
   throw lastError;
 }
-

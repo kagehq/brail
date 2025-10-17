@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -79,6 +80,11 @@ export class ReleasesController {
       body.adapter,
       body.config,
     );
+  }
+
+  @Delete('releases/:releaseId')
+  async delete(@Param('releaseId') releaseId: string) {
+    return this.releasesService.deleteRelease(releaseId);
   }
 }
 

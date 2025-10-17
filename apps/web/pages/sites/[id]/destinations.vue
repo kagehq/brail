@@ -212,7 +212,7 @@
                 </div>
                 
                 <!-- Created date -->
-                <div class="flex items-center gap-2 pt-2 mt-2 border-t border-gray-500/10">
+                <div class="flex items-center gap-2">
                   <svg class="w-3.5 h-3.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -226,7 +226,7 @@
               <button
                 v-if="!profile.isDefault"
                 @click="setDefault(profile.id)"
-                class="px-3 py-2 text-sm bg-blue-300/10 border border-blue-300/20 text-blue-300 rounded-lg hover:bg-blue-300/20 hover:border-blue-300/30 transition-all font-medium flex items-center justify-center gap-1.5"
+                class="px-3 py-2 text-sm bg-blue-300/10 border border-blue-300/10 text-blue-300 rounded-lg hover:bg-blue-300/20 hover:border-blue-300/30 transition-all font-medium flex items-center justify-center gap-1.5"
               >
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -235,7 +235,7 @@
               </button>
               <button
                 @click="openDeleteConfirmation(profile)"
-                class="px-3 py-2 text-sm bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg hover:bg-red-500/20 hover:border-red-500/30 transition-all font-medium flex items-center justify-center gap-1.5"
+                class="px-3 py-2 text-sm bg-red-500/10 border border-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 hover:border-red-500/30 transition-all font-medium flex items-center justify-center gap-1.5"
               >
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1395,6 +1395,33 @@ const handleCreate = async () => {
       if (newProfile.value.config.netlifySiteName) {
         adapterConfig.siteName = newProfile.value.config.netlifySiteName;
       }
+    } else if (newProfile.value.adapter === 'vercel') {
+      adapterConfig = {
+        token: newProfile.value.config.token,
+      };
+      
+      if (newProfile.value.config.teamId) {
+        adapterConfig.teamId = newProfile.value.config.teamId;
+      }
+      if (newProfile.value.config.projectName) {
+        adapterConfig.projectName = newProfile.value.config.projectName;
+      }
+      if (newProfile.value.config.productionDomain) {
+        adapterConfig.productionDomain = newProfile.value.config.productionDomain;
+      }
+    } else if (newProfile.value.adapter === 'cloudflare-pages') {
+      adapterConfig = {
+        accountId: newProfile.value.config.accountId,
+        apiToken: newProfile.value.config.apiToken,
+      };
+
+      if (newProfile.value.config.projectName) {
+        adapterConfig.projectName = newProfile.value.config.projectName;
+      }
+
+      if (newProfile.value.config.productionDomain) {
+        adapterConfig.productionDomain = newProfile.value.config.productionDomain;
+      }
     } else if (newProfile.value.adapter === 'cloudflare-sandbox') {
       adapterConfig = {
         accountId: newProfile.value.config.accountId,
@@ -1560,4 +1587,3 @@ const formatDate = (date: Date | string) => {
   return new Date(date).toLocaleString();
 };
 </script>
-

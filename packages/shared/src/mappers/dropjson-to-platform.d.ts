@@ -1,19 +1,18 @@
+export interface DropJsonHeaderConfig {
+    path: string;
+    set: Record<string, string>;
+}
+export interface DropJsonRedirectConfig {
+    from: string;
+    to: string;
+    status?: number;
+}
 /**
  * Parsed _drop.json configuration
  */
 export interface DropJsonConfig {
-    redirects?: Array<{
-        source: string;
-        destination: string;
-        statusCode?: number;
-    }>;
-    headers?: Array<{
-        source: string;
-        headers: Array<{
-            key: string;
-            value: string;
-        }>;
-    }>;
+    redirects?: DropJsonRedirectConfig[];
+    headers?: DropJsonHeaderConfig[];
 }
 /**
  * Parse _drop.json from a files directory
@@ -35,21 +34,14 @@ export declare function toCloudflareFiles(drop: DropJsonConfig | null): {
  *
  * {
  *   "redirects": [
- *     {
- *       "source": "/old-page",
- *       "destination": "/new-page",
- *       "statusCode": 301
- *     }
+ *     { "from": "/old-page", "to": "/new-page", "status": 301 }
  *   ],
  *   "headers": [
  *     {
- *       "source": "/(.*)",
- *       "headers": [
- *         {
- *           "key": "X-Frame-Options",
- *           "value": "DENY"
- *         }
- *       ]
+ *       "path": "/static/*.html",
+ *       "set": {
+ *         "cache-control": "no-store"
+ *       }
  *     }
  *   ]
  * }

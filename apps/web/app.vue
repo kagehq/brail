@@ -28,29 +28,30 @@
 </template>
 
 <script setup lang="ts">
+// Import composables
 // Global styles and setup
 
 // Konami Code Easter Egg 🎮
 const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+const normalizedKonami = konamiCode.map((key) => key.toLowerCase());
 const userInput = ref<string[]>([]);
 
+const handleKeyDown = (event: KeyboardEvent) => {
+  userInput.value.push(event.key.toLowerCase());
+  userInput.value = userInput.value.slice(-normalizedKonami.length);
+  
+  if (userInput.value.join(',') === normalizedKonami.join(',')) {
+    triggerEasterEgg();
+    userInput.value = []; // Reset
+  }
+};
+
 onMounted(() => {
-  const handleKeyDown = (event: KeyboardEvent) => {
-    userInput.value.push(event.key);
-    userInput.value = userInput.value.slice(-konamiCode.length);
-    
-    if (userInput.value.join(',') === konamiCode.join(',')) {
-      triggerEasterEgg();
-      userInput.value = []; // Reset
-    }
-  };
-  
   window.addEventListener('keydown', handleKeyDown);
-  
-  // Cleanup
-  onUnmounted(() => {
-    window.removeEventListener('keydown', handleKeyDown);
-  });
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown);
 });
 
 async function triggerEasterEgg() {
@@ -257,4 +258,3 @@ body {
 }
 
 </style>
-

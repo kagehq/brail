@@ -191,12 +191,12 @@
                   <!-- Error Message -->
                   <div v-if="release.status === 'failed' && release.errorMessage" class="mb-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
                     <div class="flex items-start gap-2">
-                      <svg class="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <div class="flex-1">
-                        <p class="text-sm font-semibold text-red-400 mb-1">Deployment Failed</p>
-                        <p class="text-sm text-red-300/80 leading-relaxed">{{ release.errorMessage }}</p>
+                        <p class="text-sm font-semibold text-red-500 mb-1">Deployment Failed</p>
+                        <p class="text-sm text-red-500/80 leading-relaxed">{{ release.errorMessage }}</p>
                       </div>
                     </div>
                   </div>
@@ -240,6 +240,16 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                     </svg>
                     Rollback
+                  </button>
+                  
+                  <button
+                    @click="deleteRelease(release.id)"
+                    class="px-4 py-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg hover:bg-red-500/20 hover:border-red-500/30 text-sm transition-all flex items-center gap-1.5"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete
                   </button>
                   
                   <button
@@ -425,7 +435,7 @@
                   <button
                     v-if="deploy.status !== 'active'"
                     @click="deleteDeploy(deploy.id)"
-                    class="px-3 py-2 bg-red-500/10 border border-red-500/25 text-red-400 hover:text-red-300 hover:bg-red-500/20 hover:border-red-500/40 rounded-lg text-sm transition-all flex items-center gap-1.5"
+                    class="px-3 py-2 bg-red-500/10 border border-red-500/25 text-red-500 hover:text-red-400 hover:bg-red-500/20 hover:border-red-500/40 rounded-lg text-sm transition-all flex items-center gap-1.5"
                     title="Delete deployment"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -621,6 +631,20 @@ onMounted(async () => {
     const notifications = useNotifications();
     notifications.connect();
     notifications.subscribeSite(siteId);
+    
+    // Listen for deployment-related notifications to refresh releases
+    const socket = notifications.connect();
+    if (socket) {
+      socket.on('notification', (notification: any) => {
+        // Refresh releases when deployment-related notifications are received
+        if (notification.type === 'success' && 
+            (notification.message?.includes('deploy') || 
+             notification.message?.includes('release') ||
+             notification.message?.includes('platform'))) {
+          loadReleases();
+        }
+      });
+    }
   } catch (error) {
     console.error('Failed to load site:', error);
   } finally {
@@ -724,13 +748,63 @@ const executeRollbackRelease = async (deployId: string, adapter: string) => {
   }
 };
 
-const handleDeployCreated = (deployId: string) => {
+const deleteRelease = (releaseId: string) => {
+  confirmModal.value = {
+    show: true,
+    title: 'Delete Release',
+    message: 'Are you sure you want to delete this release?',
+    description: 'This will remove the release from the platform and delete it from Vercel. This action cannot be undone.',
+    variant: 'danger',
+    onConfirm: async () => {
+      confirmModal.value.show = false;
+      await executeDeleteRelease(releaseId);
+    },
+  };
+};
+
+const executeDeleteRelease = async (releaseId: string) => {
+  const toastId = sonnerToast.loading('Deleting release...');
+  
+  try {
+    const response = await fetch(`${config.public.apiUrl}/v1/releases/${releaseId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${api.getToken()}`,
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      sonnerToast.error('Delete Failed', {
+        id: toastId,
+        description: errorData.message || 'Failed to delete release'
+      });
+      return;
+    }
+    
+    await loadReleases();
+    sonnerToast.success('Release Deleted', {
+      id: toastId,
+      description: 'The release has been removed from the platform.'
+    });
+  } catch (error: any) {
+    console.error('Failed to delete release:', error);
+    sonnerToast.error('Delete Failed', {
+      id: toastId,
+      description: error.message || 'Failed to delete release'
+    });
+  }
+};
+
+const handleDeployCreated = async (deployId: string) => {
   console.log('Deploy created:', deployId);
+  // Refresh deploys when a new deployment is created
+  await loadDeploys();
 };
 
 const handleUploadComplete = async (deployId: string) => {
   console.log('Upload complete:', deployId);
-  await loadDeploys();
+  await Promise.all([loadDeploys(), loadReleases()]);
 };
 
 const activateDeploy = (deployId: string) => {

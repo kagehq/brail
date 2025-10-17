@@ -260,6 +260,9 @@ importers:
       '@br/shared':
         specifier: workspace:*
         version: link:../shared
+      '@brailhq/adapter-kit':
+        specifier: workspace:*
+        version: link:../adapter-kit
       basic-ftp:
         specifier: ^5.0.0
         version: 5.0.5

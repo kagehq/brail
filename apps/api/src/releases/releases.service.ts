@@ -5,6 +5,7 @@ import { AdapterRegistry } from '../adapters/adapter.registry';
 import { ProfilesService } from '../profiles/profiles.service';
 import { HealthService } from '../health/health.service';
 import { EnvService } from '../env/env.service';
+import { BuildLogsService } from '../build-logs/build-logs.service';
 import type { AdapterContext } from '@br/adapters';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -31,6 +32,7 @@ export class ReleasesService {
     private readonly profilesService: ProfilesService,
     private readonly healthService: HealthService,
     private readonly envService: EnvService,
+    private readonly buildLogsService: BuildLogsService,
   ) {}
 
   /**
@@ -117,7 +119,27 @@ export class ReleasesService {
           id: deploy.siteId,
           name: deploy.site.name,
         },
+        target,
       });
+
+      // Create build log for the deployment
+      const buildLog = await this.buildLogsService.create({
+        siteId: deploy.siteId,
+        deployId,
+        framework: 'static',
+        command: `deploy to ${adapter.name}`,
+        status: 'success',
+        exitCode: 0,
+        stdout: `Successfully deployed to ${adapter.name}\nTarget: ${target}\nDestination: ${result.destinationRef || 'N/A'}\nPreview URL: ${(result as any).previewUrl || 'N/A'}`,
+        stderr: '',
+        duration: 0, // We don't track duration for now
+        nodeVersion: process.version,
+        packageManager: 'none',
+        cacheHit: false,
+        outputDir: tmpDir,
+      });
+
+      this.logger.log(`Created build log ${buildLog.id} for deployment ${deployId}`);
 
       // Create release record
       const release = await this.prisma.release.create({
@@ -281,6 +303,23 @@ export class ReleasesService {
 
       this.logger.log(`Activated deploy ${deployId}`);
 
+      // Create build log for the activation
+      await this.buildLogsService.create({
+        siteId: deploy.siteId,
+        deployId,
+        framework: 'static',
+        command: `activate on ${adapter.name}`,
+        status: 'success',
+        exitCode: 0,
+        stdout: `Successfully activated deployment on ${adapter.name}\nTarget: ${target}\nPlatform Deployment ID: ${release?.platformDeploymentId || 'N/A'}`,
+        stderr: '',
+        duration: 0,
+        nodeVersion: process.version,
+        packageManager: 'none',
+        cacheHit: false,
+        outputDir: '',
+      });
+
       return {
         success: true,
         deployId,
@@ -299,6 +338,23 @@ export class ReleasesService {
           status: 'failed',
           errorMessage,
         },
+      });
+
+      // Create build log for the failed activation
+      await this.buildLogsService.create({
+        siteId: deploy.siteId,
+        deployId,
+        framework: 'static',
+        command: `activate on ${adapter.name}`,
+        status: 'failed',
+        exitCode: 1,
+        stdout: '',
+        stderr: errorMessage,
+        duration: 0,
+        nodeVersion: process.version,
+        packageManager: 'none',
+        cacheHit: false,
+        outputDir: '',
       });
 
       throw error;
@@ -440,6 +496,73 @@ export class ReleasesService {
   }
 
   /**
+   * Delete a release
+   */
+  async deleteRelease(releaseId: string) {
+    // Get the release with deploy and site info
+    const release = await this.prisma.release.findUnique({
+      where: { id: releaseId },
+      include: {
+        deploy: {
+          include: {
+            site: true,
+          },
+        },
+      },
+    });
+
+    if (!release) {
+      throw new NotFoundException('Release not found');
+    }
+
+    this.logger.log(`Deleting release ${releaseId} for deploy ${release.deployId}`);
+
+    try {
+      // Get adapter to clean up platform resources
+      const adapter = this.adapterRegistry.getAdapter(release.adapter);
+      
+      // Create adapter context for cleanup
+      const ctx: AdapterContext = {
+        logger: this.adapterLogger,
+      };
+
+      // If the adapter has a delete method, use it to clean up platform resources
+      if (adapter.delete) {
+        try {
+          await adapter.delete(ctx, {
+            deployId: release.deployId,
+            config: {}, // We don't have the original config here
+            site: {
+              id: release.deploy.siteId,
+              name: release.deploy.site.name,
+            },
+            platformDeploymentId: release.platformDeploymentId || undefined,
+          });
+          this.logger.log(`Cleaned up platform resources for release ${releaseId}`);
+        } catch (error) {
+          this.logger.warn(`Failed to clean up platform resources for release ${releaseId}:`, error);
+          // Continue with deletion even if cleanup fails
+        }
+      }
+
+      // Delete the release from database
+      await this.prisma.release.delete({
+        where: { id: releaseId },
+      });
+
+      this.logger.log(`Deleted release ${releaseId}`);
+
+      return {
+        success: true,
+        releaseId,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to delete release ${releaseId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Download deploy files from Phase-0 storage
    */
   private async downloadDeployFiles(deployId: string, targetDir: string) {
@@ -492,4 +615,3 @@ export class ReleasesService {
     }
   }
 }
-

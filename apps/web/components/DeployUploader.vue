@@ -179,22 +179,159 @@
       </div>
       
       <!-- Destination Selection (Phase 1) -->
-      <div v-if="canFinalize && profiles.length > 0" class="pt-4 border-t border-gray-500/25">
-        <label class="block text-sm font-medium text-gray-300 mb-2">
-          Deploy Destination (Optional)
+      <div v-if="canFinalize" class="pt-4 border-t border-gray-500/25">
+        <label class="block text-sm font-medium text-gray-300 mb-3">
+          Deploy Destination
         </label>
-        <select
-          v-model="selectedProfile"
-          class="w-full bg-gray-500/10 border border-gray-500/25 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-        >
-          <option :value="null">Phase 0 (Brail Storage Only)</option>
-          <option v-for="profile in profiles" :key="profile.id" :value="profile.id">
-            {{ profile.name }} ({{ profile.adapter }})
-          </option>
-        </select>
-        <p class="mt-1 text-xs text-gray-400">
-          <span v-if="!selectedProfile">Files will be stored in Brail's storage</span>
-          <span v-else>Files will be deployed to your infrastructure via {{ selectedProfileAdapter }}</span>
+        
+        <!-- Custom Dropdown -->
+        <div class="relative destination-dropdown">
+          <button
+            @click="showDestinationDropdown = !showDestinationDropdown"
+            class="w-full bg-gray-500/10 border border-gray-500/25 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 hover:bg-gray-500/20 transition-colors flex items-center justify-between"
+          >
+            <div class="flex items-center gap-3">
+              <div class="flex-shrink-0">
+                <svg v-if="!selectedProfile" class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                <svg v-else-if="selectedProfileAdapter === 'vercel'" class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M24 22.525H0l12-21.05 12 21.05z"/>
+                </svg>
+                <svg v-else-if="selectedProfileAdapter === 'netlify'" class="w-5 h-5 text-green-300" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6.5 0L0 12h6.5L6.5 0zM17.5 0L11 12h6.5L17.5 0zM6.5 24L0 12h6.5L6.5 24zM17.5 24L11 12h6.5L17.5 24z"/>
+                </svg>
+                <svg v-else-if="selectedProfileAdapter === 'cloudflare-pages'" class="w-5 h-5 text-orange-300" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M16.95 0L8.475 8.475 0 0h16.95zM0 8.475L8.475 16.95 16.95 8.475H0zM8.475 24L0 15.525 8.475 24h8.475L8.475 24z"/>
+                </svg>
+                <svg v-else-if="selectedProfileAdapter === 'railway'" class="w-5 h-5 text-blue-300" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M0 0h24v24H0V0zm12 2L2 7v10l10 5 10-5V7L12 2z"/>
+                </svg>
+                <svg v-else-if="selectedProfileAdapter === 'fly'" class="w-5 h-5 text-purple-300" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 0L0 12l12 12 12-12L12 0zm0 2.4L2.4 12 12 21.6 21.6 12 12 2.4z"/>
+                </svg>
+                <svg v-else-if="selectedProfileAdapter === 'github-pages'" class="w-5 h-5 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 0C5.374 0 0 5.373 0 12 0 17.302 3.438 21.8 8.207 23.387c.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                </svg>
+                <svg v-else-if="selectedProfileAdapter === 's3'" class="w-5 h-5 text-yellow-300" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 0L0 6.5v11L12 24l12-6.5v-11L12 0zm0 2.5L22 8v8L12 21.5 2 16V8l10-5.5z"/>
+                </svg>
+                <svg v-else-if="selectedProfileAdapter === 'ssh-rsync'" class="w-5 h-5 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <svg v-else-if="selectedProfileAdapter === 'ftp'" class="w-5 h-5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                </svg>
+                <svg v-else-if="selectedProfileAdapter === 'cloudflare-sandbox'" class="w-5 h-5 text-orange-300" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M16.95 0L8.475 8.475 0 0h16.95zM0 8.475L8.475 16.95 16.95 8.475H0zM8.475 24L0 15.525 8.475 24h8.475L8.475 24z"/>
+                </svg>
+                <svg v-else-if="selectedProfileAdapter === 'vercel-sandbox'" class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M24 22.525H0l12-21.05 12 21.05z"/>
+                </svg>
+                <svg v-else class="w-5 h-5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <div class="text-left">
+                <div class="font-medium">{{ getSelectedDestinationName() }}</div>
+                <div class="text-xs text-gray-400">{{ getSelectedDestinationDescription() }}</div>
+              </div>
+            </div>
+            <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': showDestinationDropdown }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          <!-- Dropdown Menu -->
+          <div v-if="showDestinationDropdown" class="absolute z-10 w-full mt-1 bg-black border border-gray-500/25 rounded-lg shadow-xl overflow-hidden">
+            <!-- Brail Storage Option -->
+            <button
+              @click="selectDestination(null)"
+              class="w-full px-4 py-3 text-left hover:bg-gray-500/20 transition-colors flex items-center gap-3"
+              :class="{ 'bg-gray-500/15': !selectedProfile }"
+            >
+              <div class="flex-shrink-0">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-medium text-white">Brail Storage Only</div>
+                <div class="text-xs text-gray-400">Files stored in Brail's secure storage</div>
+              </div>
+            </button>
+            
+            <!-- Profile Options -->
+            <div v-if="profiles.length > 0" class="border-t border-gray-500/25">
+              <div class="px-4 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide">
+                Deploy to Infrastructure
+              </div>
+              <button
+                v-for="profile in profiles"
+                :key="profile.id"
+                @click="selectDestination(profile.id)"
+                class="w-full px-4 py-3 text-left hover:bg-gray-700/50 transition-colors flex items-center gap-3"
+                :class="{ 'bg-blue-300/10 border-l-2 border-blue-300': selectedProfile === profile.id }"
+              >
+                <div class="flex-shrink-0">
+                  <svg v-if="profile.adapter === 'vercel'" class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 22.525H0l12-21.05 12 21.05z"/>
+                  </svg>
+                  <svg v-else-if="profile.adapter === 'netlify'" class="w-5 h-5 text-green-300" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6.5 0L0 12h6.5L6.5 0zM17.5 0L11 12h6.5L17.5 0zM6.5 24L0 12h6.5L6.5 24zM17.5 24L11 12h6.5L17.5 24z"/>
+                  </svg>
+                  <svg v-else-if="profile.adapter === 'cloudflare-pages'" class="w-5 h-5 text-orange-300" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M16.95 0L8.475 8.475 0 0h16.95zM0 8.475L8.475 16.95 16.95 8.475H0zM8.475 24L0 15.525 8.475 24h8.475L8.475 24z"/>
+                  </svg>
+                  <svg v-else-if="profile.adapter === 'railway'" class="w-5 h-5 text-blue-300" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M0 0h24v24H0V0zm12 2L2 7v10l10 5 10-5V7L12 2z"/>
+                  </svg>
+                  <svg v-else-if="profile.adapter === 'fly'" class="w-5 h-5 text-purple-300" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 0L0 12l12 12 12-12L12 0zm0 2.4L2.4 12 12 21.6 21.6 12 12 2.4z"/>
+                  </svg>
+                  <svg v-else-if="profile.adapter === 'github-pages'" class="w-5 h-5 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 0C5.374 0 0 5.373 0 12 0 17.302 3.438 21.8 8.207 23.387c.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                  </svg>
+                  <svg v-else-if="profile.adapter === 's3'" class="w-5 h-5 text-yellow-300" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 0L0 6.5v11L12 24l12-6.5v-11L12 0zm0 2.5L22 8v8L12 21.5 2 16V8l10-5.5z"/>
+                  </svg>
+                  <svg v-else-if="profile.adapter === 'ssh-rsync'" class="w-5 h-5 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <svg v-else-if="profile.adapter === 'ftp'" class="w-5 h-5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                  </svg>
+                  <svg v-else-if="profile.adapter === 'cloudflare-sandbox'" class="w-5 h-5 text-orange-300" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M16.95 0L8.475 8.475 0 0h16.95zM0 8.475L8.475 16.95 16.95 8.475H0zM8.475 24L0 15.525 8.475 24h8.475L8.475 24z"/>
+                  </svg>
+                  <svg v-else-if="profile.adapter === 'vercel-sandbox'" class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 22.525H0l12-21.05 12 21.05z"/>
+                  </svg>
+                  <svg v-else class="w-5 h-5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <div class="font-medium text-white flex items-center gap-2">
+                    {{ profile.name }}
+                    <span v-if="profile.isDefault" class="text-xs bg-blue-300/20 text-blue-300 px-2 py-0.5 rounded-full">Default</span>
+                  </div>
+                  <div class="text-xs text-gray-400">{{ getAdapterDisplayName(profile.adapter) }}</div>
+                </div>
+              </button>
+            </div>
+            
+            <!-- No Profiles Message -->
+            <div v-else class="px-4 py-3 text-center text-gray-400">
+              <div class="text-sm">No connection profiles found</div>
+              <div class="text-xs mt-1">Create a profile in the Destinations tab</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Description -->
+        <p class="mt-2 text-xs text-gray-400">
+          {{ getSelectedDestinationDescription() }}
         </p>
       </div>
       
@@ -270,6 +407,23 @@ const activating = ref(false);
 const profiles = ref<ConnectionProfile[]>([]);
 const selectedProfile = ref<string | null>(null);
 const deploymentNotes = ref<string>('');
+const showDestinationDropdown = ref(false);
+
+// Close dropdown when clicking outside
+onMounted(() => {
+  const handleClickOutside = (event: MouseEvent) => {
+    const dropdown = document.querySelector('.destination-dropdown');
+    if (dropdown && !dropdown.contains(event.target as Node)) {
+      showDestinationDropdown.value = false;
+    }
+  };
+  
+  document.addEventListener('click', handleClickOutside);
+  
+  onUnmounted(() => {
+    document.removeEventListener('click', handleClickOutside);
+  });
+});
 
 // Upload speed tracking
 const uploadStartTime = ref<number>(0);
@@ -750,6 +904,55 @@ const cancelUpload = async () => {
   sonnerToast.info('Upload Cancelled', {
     description: 'The deployment has been cancelled.'
   });
+};
+
+// Destination selection methods
+const selectDestination = (profileId: string | null) => {
+  selectedProfile.value = profileId;
+  showDestinationDropdown.value = false;
+};
+
+const getSelectedDestinationName = () => {
+  if (!selectedProfile.value) {
+    return 'Brail Storage Only';
+  }
+  const profile = profiles.value.find(p => p.id === selectedProfile.value);
+  return profile?.name || 'Unknown Profile';
+};
+
+const getSelectedDestinationDescription = () => {
+  if (!selectedProfile.value) {
+    return 'Files will be stored in Brail\'s secure storage';
+  }
+  const profile = profiles.value.find(p => p.id === selectedProfile.value);
+  if (profile) {
+    return `Files will be deployed to your infrastructure via ${getAdapterDisplayName(profile.adapter)}`;
+  }
+  return 'Files will be deployed to your infrastructure';
+};
+
+const getAdapterDisplayName = (adapter: string) => {
+  const adapterNames: Record<string, string> = {
+    // Phase 1 adapters
+    'ssh-rsync': 'SSH + rsync',
+    's3': 'Amazon S3',
+    'ftp': 'FTP',
+    
+    // Phase 2 adapters
+    'vercel': 'Vercel',
+    'cloudflare-pages': 'Cloudflare Pages',
+    'netlify': 'Netlify',
+    
+    // Phase 3 adapters
+    'railway': 'Railway',
+    'fly': 'Fly.io',
+    'github-pages': 'GitHub Pages',
+    
+    // Phase 4 adapters
+    'cloudflare-sandbox': 'Cloudflare Sandbox',
+    'vercel-sandbox': 'Vercel Sandbox'
+  };
+  return adapterNames[adapter] || adapter;
 };
 </script>
 
