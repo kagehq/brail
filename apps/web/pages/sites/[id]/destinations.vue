@@ -136,6 +136,28 @@
                   </div>
                 </div>
                 
+                <!-- Cloudflare Sandbox config -->
+                <div v-if="profile.adapter === 'cloudflare-sandbox' && profile.config" class="flex items-start gap-2">
+                  <svg class="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm text-white truncate">{{ profile.config.runtime || 'node' }} • {{ profile.config.buildCommand || 'npm run build' }}</p>
+                    <p class="text-xs text-gray-500 truncate font-mono">{{ profile.config.accountId }}</p>
+                  </div>
+                </div>
+                
+                <!-- Vercel Sandbox config -->
+                <div v-if="profile.adapter === 'vercel-sandbox' && profile.config" class="flex items-start gap-2">
+                  <svg class="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm text-white truncate">{{ profile.config.runtime || 'node22' }} • {{ profile.config.vcpus || 2 }} vCPUs</p>
+                    <p class="text-xs text-gray-500 truncate font-mono">{{ profile.config.projectId }}</p>
+                  </div>
+                </div>
+                
                 <!-- Railway config -->
                 <div v-if="profile.adapter === 'railway' && profile.config" class="flex items-start gap-2">
                   <svg class="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -298,6 +320,10 @@
                 <option value="railway" class="bg-black text-white">Railway</option>
                 <option value="fly" class="bg-black text-white">Fly.io</option>
                 <option value="github-pages" class="bg-black text-white">GitHub Pages</option>
+              </optgroup>
+              <optgroup label="Dynamic & Server-side" class="bg-black text-white">
+                <option value="cloudflare-sandbox" class="bg-black text-white">Cloudflare Sandbox</option>
+                <option value="vercel-sandbox" class="bg-black text-white">Vercel Sandbox</option>
               </optgroup>
             </select>
           </div>
@@ -523,6 +549,268 @@
                 class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
                 placeholder="3"
               />
+            </div>
+          </div>
+          
+          <!-- Cloudflare Sandbox Config -->
+          <div v-if="newProfile.adapter === 'cloudflare-sandbox'" class="space-y-4 p-4 border border-gray-500/15 rounded-lg">
+            <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <svg class="w-5 h-5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              Cloudflare Sandbox Configuration
+            </h3>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Account ID</label>
+              <input
+                v-model="newProfile.config.accountId"
+                type="text"
+                required
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="your-cloudflare-account-id"
+              />
+              <p class="text-xs text-gray-500 mt-1">Get from Cloudflare dashboard</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">API Token</label>
+              <input
+                v-model="newProfile.config.apiToken"
+                type="password"
+                required
+                autocomplete="new-password"
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="your-api-token"
+              />
+              <p class="text-xs text-gray-500 mt-1">Create at Cloudflare dashboard → My Profile → API Tokens</p>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Runtime</label>
+                <select
+                  v-model="newProfile.config.runtime"
+                  class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                >
+                  <option value="node">Node.js</option>
+                  <option value="python">Python</option>
+                  <option value="deno">Deno</option>
+                </select>
+              </div>
+              
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Port</label>
+                <input
+                  v-model="newProfile.config.sandboxPort"
+                  type="number"
+                  class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                  placeholder="3000"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Build Command</label>
+              <input
+                v-model="newProfile.config.buildCommand"
+                type="text"
+                required
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="npm run build"
+              />
+              <p class="text-xs text-gray-500 mt-1">Command to build your application</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Start Command</label>
+              <input
+                v-model="newProfile.config.startCommand"
+                type="text"
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="npm start"
+              />
+              <p class="text-xs text-gray-500 mt-1">Command to start your application (optional)</p>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Memory (MB)</label>
+                <input
+                  v-model="newProfile.config.sandboxMemory"
+                  type="number"
+                  class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                  placeholder="128"
+                />
+              </div>
+              
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Timeout (seconds)</label>
+                <input
+                  v-model="newProfile.config.sandboxTimeout"
+                  type="number"
+                  class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                  placeholder="300"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">R2 Bucket (for static files)</label>
+              <input
+                v-model="newProfile.config.sandboxBucket"
+                type="text"
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="your-r2-bucket"
+              />
+              <p class="text-xs text-gray-500 mt-1">Optional: R2 bucket for static file storage</p>
+            </div>
+          </div>
+          
+          <!-- Vercel Sandbox Config -->
+          <div v-if="newProfile.adapter === 'vercel-sandbox'" class="space-y-4 p-4 border border-gray-500/15 rounded-lg">
+            <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <svg class="w-5 h-5 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              Vercel Sandbox Configuration
+            </h3>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Team ID</label>
+              <input
+                v-model="newProfile.config.vercelTeamId"
+                type="text"
+                required
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="team_xxxxxxxxxxxxxxxx"
+              />
+              <p class="text-xs text-gray-500 mt-1">Get from Vercel dashboard → Settings → General</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Project ID</label>
+              <input
+                v-model="newProfile.config.vercelProjectId"
+                type="text"
+                required
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="prj_xxxxxxxxxxxxxxxx"
+              />
+              <p class="text-xs text-gray-500 mt-1">Get from Vercel dashboard → Project Settings</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Access Token</label>
+              <input
+                v-model="newProfile.config.vercelToken"
+                type="password"
+                required
+                autocomplete="new-password"
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="vercel_xxxxxxxxxxxxxxxx"
+              />
+              <p class="text-xs text-gray-500 mt-1">Create at Vercel dashboard → Settings → Tokens</p>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Runtime</label>
+                <select
+                  v-model="newProfile.config.vercelRuntime"
+                  class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                >
+                  <option value="node22">Node.js 22</option>
+                  <option value="python3.13">Python 3.13</option>
+                </select>
+              </div>
+              
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">vCPUs</label>
+                <select
+                  v-model="newProfile.config.vercelVcpus"
+                  class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                >
+                  <option value="1">1 vCPU</option>
+                  <option value="2">2 vCPUs</option>
+                  <option value="3">3 vCPUs</option>
+                  <option value="4">4 vCPUs</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Timeout (minutes)</label>
+                <select
+                  v-model="newProfile.config.vercelTimeout"
+                  class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                >
+                  <option value="5">5 minutes</option>
+                  <option value="10">10 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">1 hour</option>
+                  <option value="300">5 hours</option>
+                </select>
+              </div>
+              
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Ports</label>
+                <input
+                  v-model="newProfile.config.vercelPorts"
+                  type="text"
+                  class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                  placeholder="3000,8080"
+                />
+                <p class="text-xs text-gray-500 mt-1">Comma-separated port numbers</p>
+              </div>
+            </div>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Source Repository URL</label>
+              <input
+                v-model="newProfile.config.vercelSourceUrl"
+                type="url"
+                required
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="https://github.com/username/repo.git"
+              />
+              <p class="text-xs text-gray-500 mt-1">Git repository URL to clone and deploy</p>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Build Command</label>
+                <input
+                  v-model="newProfile.config.vercelBuildCommand"
+                  type="text"
+                  class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                  placeholder="npm run build"
+                />
+                <p class="text-xs text-gray-500 mt-1">Command to build your application</p>
+              </div>
+              
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Start Command</label>
+                <input
+                  v-model="newProfile.config.vercelStartCommand"
+                  type="text"
+                  class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                  placeholder="npm start"
+                />
+                <p class="text-xs text-gray-500 mt-1">Command to start your application</p>
+              </div>
+            </div>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Working Directory</label>
+              <input
+                v-model="newProfile.config.vercelWorkingDirectory"
+                type="text"
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="/vercel/sandbox"
+              />
+              <p class="text-xs text-gray-500 mt-1">Optional: Custom working directory path</p>
             </div>
           </div>
           
@@ -908,6 +1196,26 @@ const newProfile = ref({
     accessToken: '',
     appName: '',
     org: '',
+    // Cloudflare Sandbox
+    runtime: 'node',
+    buildCommand: 'npm run build',
+    startCommand: 'npm start',
+    sandboxPort: 3000,
+    sandboxMemory: 128,
+    sandboxTimeout: 300,
+    sandboxBucket: '',
+    // Vercel Sandbox
+    vercelTeamId: '',
+    vercelProjectId: '',
+    vercelToken: '',
+    vercelRuntime: 'node22',
+    vercelVcpus: 2,
+    vercelTimeout: 5,
+    vercelPorts: '3000',
+    vercelSourceUrl: '',
+    vercelBuildCommand: 'npm run build',
+    vercelStartCommand: 'npm start',
+    vercelWorkingDirectory: '/vercel/sandbox',
   } as any,
 });
 
@@ -965,6 +1273,12 @@ const getAdapterIcon = (adapter: string) => {
     'netlify': h('svg', { fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
       h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9' }),
     ]),
+    'cloudflare-sandbox': h('svg', { fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' }),
+    ]),
+    'vercel-sandbox': h('svg', { fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' }),
+    ]),
   };
   return iconMap[adapter] || iconMap['ssh-rsync'];
 };
@@ -981,6 +1295,8 @@ const getAdapterColor = (adapter: string) => {
     'ftp': 'text-green-300 bg-green-300/10 border-green-300/20',
     'github-pages': 'text-gray-300 bg-gray-300/10 border-gray-300/20',
     'netlify': 'text-teal-300 bg-teal-300/10 border-teal-300/20',
+    'cloudflare-sandbox': 'text-indigo-300 bg-indigo-300/10 border-indigo-300/20',
+    'vercel-sandbox': 'text-orange-300 bg-orange-300/10 border-orange-300/20',
   };
   return colorMap[adapter] || 'text-gray-300 bg-gray-300/10 border-gray-300/20';
 };
@@ -997,6 +1313,8 @@ const getAdapterLabel = (adapter: string) => {
     'ftp': 'FTP',
     'github-pages': 'GitHub Pages',
     'netlify': 'Netlify',
+    'cloudflare-sandbox': 'Cloudflare Sandbox',
+    'vercel-sandbox': 'Vercel Sandbox',
   };
   return labelMap[adapter] || adapter;
 };
@@ -1077,6 +1395,38 @@ const handleCreate = async () => {
       if (newProfile.value.config.netlifySiteName) {
         adapterConfig.siteName = newProfile.value.config.netlifySiteName;
       }
+    } else if (newProfile.value.adapter === 'cloudflare-sandbox') {
+      adapterConfig = {
+        accountId: newProfile.value.config.accountId,
+        apiToken: newProfile.value.config.apiToken,
+        runtime: newProfile.value.config.runtime || 'node',
+        buildCommand: newProfile.value.config.buildCommand,
+        startCommand: newProfile.value.config.startCommand || 'npm start',
+        port: newProfile.value.config.sandboxPort || 3000,
+        memory: newProfile.value.config.sandboxMemory || 128,
+        timeout: newProfile.value.config.sandboxTimeout || 300,
+      };
+      
+      if (newProfile.value.config.sandboxBucket) {
+        adapterConfig.bucket = newProfile.value.config.sandboxBucket;
+      }
+    } else if (newProfile.value.adapter === 'vercel-sandbox') {
+      adapterConfig = {
+        teamId: newProfile.value.config.vercelTeamId,
+        projectId: newProfile.value.config.vercelProjectId,
+        token: newProfile.value.config.vercelToken,
+        runtime: newProfile.value.config.vercelRuntime || 'node22',
+        vcpus: Number(newProfile.value.config.vercelVcpus) || 2,
+        timeout: Number(newProfile.value.config.vercelTimeout) * 60000 || 300000, // Convert minutes to milliseconds
+        ports: newProfile.value.config.vercelPorts ? newProfile.value.config.vercelPorts.split(',').map(Number) : [3000],
+        source: {
+          url: newProfile.value.config.vercelSourceUrl,
+          type: 'git',
+        },
+        buildCommand: newProfile.value.config.vercelBuildCommand,
+        startCommand: newProfile.value.config.vercelStartCommand,
+        workingDirectory: newProfile.value.config.vercelWorkingDirectory,
+      };
     }
     
     const response = await fetch(`${config.public.apiUrl}/v1/sites/${siteId}/profiles`, {

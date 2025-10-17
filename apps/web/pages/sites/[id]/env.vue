@@ -35,6 +35,8 @@
               <optgroup label="Platform Adapters">
                 <option value="adapter:vercel">Vercel</option>
                 <option value="adapter:cloudflare">Cloudflare</option>
+                <option value="adapter:cloudflare-sandbox">Cloudflare Sandbox</option>
+                <option value="adapter:vercel-sandbox">Vercel Sandbox</option>
                 <option value="adapter:netlify">Netlify</option>
                 <option value="adapter:railway">Railway</option>
                 <option value="adapter:fly">Fly.io</option>
@@ -439,6 +441,8 @@ const scopes = [
   { value: 'runtime:production', label: 'Runtime (Production)' },
   { value: 'adapter:vercel', label: 'Vercel' },
   { value: 'adapter:cloudflare', label: 'Cloudflare' },
+  { value: 'adapter:cloudflare-sandbox', label: 'Cloudflare Sandbox' },
+  { value: 'adapter:vercel-sandbox', label: 'Vercel Sandbox' },
   { value: 'adapter:netlify', label: 'Netlify' },
   { value: 'adapter:railway', label: 'Railway' },
   { value: 'adapter:fly', label: 'Fly.io' },

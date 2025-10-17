@@ -9,6 +9,8 @@ const VALID_SCOPES = [
   'runtime:production',
   'adapter:vercel',
   'adapter:cloudflare',
+  'adapter:cloudflare-sandbox',
+  'adapter:vercel-sandbox',
   'adapter:netlify',
   'adapter:railway',
   'adapter:fly',

@@ -1,19 +1,18 @@
 # Brail
 
-> Deploy static sites anywhere with zero downtime and instant rollbacks.
+> Deploy static sites and dynamic applications anywhere with zero downtime and instant rollbacks.
 
 **Brail** is a modern filezilla that lets you push your site to your own servers, cloud storage, or platforms like Vercel and Cloudflare Pages. Full control, no vendor lock-in.
 
 ## Features
 
 - Deploy to your own servers (SSH/FTP), S3, or platforms (Vercel/Netlify/Railway)
+- **Dynamic sites** with Cloudflare Sandbox & Vercel Sandbox (AI-powered, interactive playgrounds)
 - Zero downtime deployments with instant rollbacks
 - Auto-detect and build Next.js, Astro, Vite, Nuxt, SvelteKit
-- Scoped environment variables with encryption (build, runtime, adapter)
-- Custom domains with DNS verification
-- Auto-SSL via Let's Encrypt (HTTPS made easy)
+- Scoped environment variables with encryption
+- Custom domains with auto-SSL via Let's Encrypt
 - Replace single files without full redeploy
-- Watch mode for auto-deploy on save
 - Drag & drop UI + powerful CLI
 
 ## Quick Start
@@ -40,35 +39,24 @@ Open http://localhost:3001 to use the web interface.
 
 ## Deploy Your Site
 
-### Web Interface
-
+### Web Interface (Recommended)
 1. Go to http://localhost:3001 and create a site
 2. Drag your build folder into the upload zone
 3. Click "Finalize & Deploy"
 4. Your site is live at the preview URL
 
-### CLI
-
+### CLI (Optional)
 ```bash
 # Install CLI globally
 cd apps/cli && pnpm build && pnpm link --global
 
-# Login
-br login
-
 # Deploy your site
 br drop ./dist --site <siteId> --yes
-
-# Replace a single file (no full redeploy)
-br replace ./app.css --site <siteId> --dest /css/app.css --yes
-
-# Watch for changes and auto-deploy
-br watch --site <siteId> --root ./dist --auto
 ```
 
 ## Ignore Files with .dropignore
 
-Create a `.dropignore` file to exclude files and directories from deployment (similar to `.gitignore`):
+Create a `.dropignore` file to exclude files from deployment:
 
 ```
 # .dropignore example
@@ -76,226 +64,38 @@ node_modules/
 .git/
 *.log
 .env
-.DS_Store
-src/
-*.test.js
 ```
-
-**Supported patterns:**
-- `node_modules/` - Ignore entire directory
-- `*.log` - Wildcard patterns
-- `.env` - Exact file names
-- `# comments` - Lines starting with # are ignored
-
-This works with both drag-and-drop uploads and CLI deployments.
-
-## Build Your Project
-
-Brail automatically detects and builds popular frameworks:
-
-```bash
-# Auto-detect framework and build
-br build .
-
-# Build and deploy in one command
-br drop . --build auto --site <siteId> --yes
-
-# Specify framework explicitly
-br drop . --build auto --framework next --site <siteId>
-
-# Custom build command
-br drop . --build "pnpm build" --output dist --site <siteId>
-
-# Skip dependency installation (use existing node_modules)
-br build . --skip-install
-```
-
-**Supported:** Next.js, Astro, Vite, Nuxt, SvelteKit, TanStack Start, React, Vue, static HTML
-
-Brail validates your build output and warns about SSR routes or missing configs. Build logs are captured and downloadable from the Activity tab.
 
 ## Environment Variables
 
-Manage secrets and configuration with **scoped environment variables**. Variables are encrypted at rest (AES-256-GCM) and can be scoped to specific environments and adapters.
+Manage environment variables through the web interface:
 
-### Available Scopes
+1. Go to your site's **Environment** tab
+2. Add variables for different scopes:
+   - **Build** - Available during build process
+   - **Runtime** - Available to your application
+   - **Adapter** - Platform-specific variables
 
-- **`build`** - Injected during build process (coming soon in CLI)
-- **`runtime:preview`** - For preview deployments
-- **`runtime:production`** - For production deployments
-- **`adapter:<name>`** - Platform-specific (e.g., `adapter:vercel`, `adapter:s3`)
-- **`ssh-agent`** - For SSH deployments (coming soon)
+**Available scopes:** `build`, `runtime:preview`, `runtime:production`, `adapter:<name>`
 
-### CLI Usage
+## Available Adapters
 
-```bash
-# Set a variable
-br env set API_URL=https://api.example.com --site <siteId> --scope build --public
-br env set API_KEY=secret123 --site <siteId> --scope build
+**Static & Storage (7):**
+- **SSH/Rsync** - Deploy to your own servers via SSH
+- **FTP** - Upload to any FTP server
+- **S3** - AWS S3, MinIO, or S3-compatible storage
+- **Vercel** - Deploy to Vercel platform
+- **Cloudflare Pages** - Deploy to Cloudflare Pages
+- **Netlify** - Deploy to Netlify platform
+- **GitHub Pages** - Deploy to GitHub Pages
 
-# List variables (secrets are masked)
-br env list --site <siteId> --scope build
+**Dynamic & Server-side (2):**
+- **Cloudflare Sandbox** - Edge computing with global distribution
+- **Vercel Sandbox** - Enterprise-grade sandbox with superior observability
 
-# Reveal a secret value
-br env reveal API_KEY --site <siteId> --scope build
-
-# Import from .env file
-br env import .env.production --site <siteId> --scope runtime:production --yes
-
-# Export to .env file (decrypted)
-br env export --site <siteId> --scope build --output .env.local
-
-# Delete a variable
-br env delete API_KEY --site <siteId> --scope build --yes
-```
-
-### Web Interface
-
-Navigate to **Environment** tab in your site dashboard:
-
-1. **Add variables** with the "Add Variable" button
-2. **Reveal secrets** by clicking the "Reveal" button
-3. **Search and filter** variables in real-time
-4. **Use templates** for common variables (NODE_ENV, API_URL, etc.)
-5. **Switch scopes** using the tabs at the top
-
-### How It Works
-
-**Encryption:**
-- All values are encrypted using AES-256-GCM before storage
-- Requires `ENCRYPTION_KEY` in your `.env` (32 bytes, generate with `openssl rand -hex 32`)
-- Only decrypted when needed (builds, deployments, or explicit reveal)
-
-**Scope Resolution:**
-- Variables are fetched based on deployment target
-- Adapter-specific variables override runtime variables
-- Example: `adapter:vercel` vars take precedence over `runtime:production`
-
-**Integration:**
-- **Deployments**: Automatically injected when staging/activating releases
-- **Builds**: Will be injected into build process (CLI feature coming soon)
-- **Adapters**: Access via `ctx.env` in custom adapters
-
-### Examples
-
-**API Configuration:**
-```bash
-# Set API URL for both environments
-br env set API_URL=https://api-staging.example.com --site <siteId> --scope runtime:preview --public
-br env set API_URL=https://api.example.com --site <siteId> --scope runtime:production --public
-
-# Set API key (secret)
-br env set API_KEY=prod_key_123 --site <siteId> --scope runtime:production
-```
-
-**Vercel-Specific Variables:**
-```bash
-# These only apply when deploying to Vercel
-br env set VERCEL_TOKEN=<token> --site <siteId> --scope adapter:vercel
-br env set VERCEL_PROJECT_ID=<id> --site <siteId> --scope adapter:vercel
-```
-
-**Import from File:**
-```bash
-# .env.production
-NODE_ENV=production
-API_URL=https://api.example.com
-API_KEY=secret_production_key
-DATABASE_URL=postgresql://user:pass@host:5432/db
-
-# Import all at once
-br env import .env.production --site <siteId> --scope runtime:production --yes
-```
-
-### Security Best Practices
-
-1. **Never commit secrets** - Use `.gitignore` for `.env` files
-2. **Use secret mode** - Mark sensitive values as secrets (default behavior)
-3. **Scope appropriately** - Use production scope only for production secrets
-4. **Rotate regularly** - Update secrets periodically, especially API keys
-5. **Audit activity** - Check the Activity tab for env var changes
-
-### Templates
-
-Brail provides quick-add templates for common variables:
-
-- `NODE_ENV` - Node environment (development/production)
-- `API_URL` - API base URL
-- `API_KEY` - API authentication key
-- `DATABASE_URL` - Database connection string
-- `NEXT_PUBLIC_*` - Next.js public variables
-- `VITE_*` - Vite public variables
-- `PUBLIC_*` - Generic public variables
-- `SECRET_KEY` - Application secret key
-
-## Custom Domains
-
-```bash
-br domain add www.example.com --site <siteId>
-br domain verify www.example.com --site <siteId>
-```
-
-The Domains tab shows DNS instructions and verification status.
-
-## Deploy to Your Infrastructure
-
-Brail includes adapters for deploying to your own servers and cloud storage:
-
-### SSH/rsync (Any Linux Server)
-Deploy to your VPS with atomic symlink switching. Works with nginx, Apache, Caddy, etc.
-
-```bash
-br profiles add --site <siteId> --adapter ssh-rsync \
-  --host your-server.com --user deploy \
-  --privateKey @~/.ssh/id_ed25519 \
-  --basePath /var/www/my-site
-```
-
-### FTP (Shared Hosting)
-Works with traditional hosting providers like Hostgator, Bluehost, etc.
-
-```bash
-br profiles add --site <siteId> --adapter ftp \
-  --host ftp.example.com --user username \
-  --password @~/.secrets/ftp-pass \
-  --basePath /public_html
-```
-
-### S3 (Cloud Storage)
-Deploy to AWS S3, Cloudflare R2, DigitalOcean Spaces, or any S3-compatible storage.
-
-```bash
-br profiles add --site <siteId> --adapter s3 \
-  --bucket my-bucket --region us-east-1 \
-  --accessKeyId AKIA... --secretAccessKey ...
-```
-
-## Deploy to Cloud Platforms
-
-### Vercel, Cloudflare Pages, Netlify
-Get automatic preview URLs and one-click production promotion.
-
-```bash
-# Add profile
-br profiles add --site <siteId> --adapter vercel \
-  --token @~/.secrets/vercel.token --projectName my-site
-
-# Deploy to preview
-br drop ./dist --site <siteId> --profile vercel --target preview
-
-# Promote to production
-br promote --site <siteId> --to <deployId> --profile vercel
-```
-
-### Railway, Fly.io, GitHub Pages
-Deploy to modern cloud platforms with built-in rollback support.
-
-```bash
-br profiles add --site <siteId> --adapter railway \
-  --token @~/.secrets/railway.token --projectId prj_abc123
-
-br drop ./dist --site <siteId> --profile railway
-```
+**Platforms (2):**
+- **Railway** - Deploy to Railway platform
+- **Fly.io** - Deploy to Fly.io platform
 
 ## Custom Adapters
 
@@ -303,92 +103,23 @@ Build your own adapter with [`@brailhq/adapter-kit`](https://www.npmjs.com/packa
 
 ```bash
 npm create br-adapter
-# Follow the interactive prompts
-
-cd br-adapter-{name}
-npm install
-npm run dev
 ```
 
-See [`ADAPTER_SDK.md`](./ADAPTER_SDK.md) for full docs or check out the [npm package](https://www.npmjs.com/package/@brailhq/adapter-kit).
+## Quick File Updates
 
-**Built-in adapters:** ssh-rsync, ftp, s3, vercel, cloudflare-pages, netlify, railway, fly, github-pages
+Replace or delete individual files without redeploying your entire site through the web interface:
 
-## Quick File Updates (No Full Redeploy)
-
-Replace a single file or delete paths without redeploying your entire site:
-
-```bash
-# Replace one file
-br replace ./logo.png --site <siteId> --dest /images/logo.png --yes
-
-# Replace entire directory
-br replace-dir ./images --site <siteId> --dest /images/ --yes
-
-# Delete files
-br delete-paths --site <siteId> --paths "/old,/unused.jpg" --yes
-
-# Watch for changes and auto-patch
-br watch --site <siteId> --root ./dist --base / --auto
-```
-
-**How it works**: Unchanged files reference the original deployment (no duplication). Only changed/deleted files are tracked in the patch. Rollback works on patches too.
-
-
-## Configuration
-
-### Environment Variables
-
-Create `apps/api/.env`:
-```bash
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/brail
-SECRET_KEY_256=<64-char-hex-from-generate-key-script>
-SESSION_SECRET=<random-secret>
-MINIO_ENDPOINT=localhost
-MINIO_PORT=9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-
-# Optional: Custom domains
-PUBLIC_HOST=dev.br.local  # CNAME target for custom domains
-
-# Optional: Community adapters
-BR_ENABLE_THIRD_PARTY_ADAPTERS=true  # Enable br-adapter-* discovery
-BR_ADAPTER_DIRS=/path/to/adapters    # Additional search directories (colon-separated)
-```
-
-### Services
-
-- **Web UI**: http://localhost:3001
-- **API**: http://localhost:3000
-- **MinIO Console**: http://localhost:9001 (admin/password)
-- **Postgres**: localhost:5432
-
-## Documentation
-
-- `br --help` - CLI reference
-- `ADAPTER_SDK.md` - Build custom adapters
-- `/example-site/` - Example project
-
-## Development
-
-```bash
-# Start development servers
-pnpm dev
-
-# Run linting
-pnpm lint
-
-# Build everything
-pnpm build
-
-# Run tests
-pnpm test
-```
+1. Go to your site's **Files** tab
+2. Upload new files or delete existing ones
+3. Changes are applied instantly without full redeploy
 
 ## Contributing
 
-PRs welcome! To add an adapter, run `npm create br-adapter` and publish to npm.
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
 
 ## License
 
