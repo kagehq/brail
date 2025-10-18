@@ -15,6 +15,12 @@
 - Replace single files without full redeploy
 - Drag & drop UI + powerful CLI
 
+## Community & Support
+
+Join our Discord community for discussions, support, and updates:
+
+[![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/KqdBcqRk5E)
+
 ## Quick Start
 
 ```bash
