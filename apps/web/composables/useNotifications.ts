@@ -10,10 +10,11 @@ interface Notification {
   metadata?: any;
 }
 
+// Singleton socket instance
+let socket: Socket | null = null;
+
 export const useNotifications = () => {
   const config = useRuntimeConfig();
-  
-  let socket: Socket | null = null;
 
   const connect = () => {
     if (socket?.connected) return socket;

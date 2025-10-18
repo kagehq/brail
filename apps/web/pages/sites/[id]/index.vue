@@ -629,11 +629,10 @@ onMounted(async () => {
     
     // Connect to real-time notifications
     const notifications = useNotifications();
-    notifications.connect();
+    const socket = notifications.connect();
     notifications.subscribeSite(siteId);
     
     // Listen for deployment-related notifications to refresh releases
-    const socket = notifications.connect();
     if (socket) {
       socket.on('notification', (notification: any) => {
         // Refresh releases when deployment-related notifications are received
