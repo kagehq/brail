@@ -178,6 +178,22 @@
                   </div>
                 </div>
                 
+                <!-- Render config -->
+                <div v-if="profile.adapter === 'render' && profile.config" class="flex items-start gap-2">
+                  <svg class="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v4m0 0L5 3m4 4l4-4m6 14v4m0 0l-4-4m4 4l4-4M3 12h18" />
+                  </svg>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm text-white font-mono truncate">
+                      {{ profile.config.staticSiteId || profile.config.serviceId }}
+                    </p>
+                    <p class="text-xs text-gray-500">
+                      {{ profile.config.staticSiteId ? 'Static Site upload' : 'Service deploy trigger' }}
+                      <span v-if="profile.config.branch">• branch: {{ profile.config.branch }}</span>
+                    </p>
+                  </div>
+                </div>
+                
                 <!-- FTP config -->
                 <div v-if="profile.adapter === 'ftp' && profile.config" class="flex items-start gap-2">
                   <svg class="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -319,6 +335,7 @@
               <optgroup label="Cloud & Open Source" class="bg-black text-white">
                 <option value="railway" class="bg-black text-white">Railway</option>
                 <option value="fly" class="bg-black text-white">Fly.io</option>
+                <option value="render" class="bg-black text-white">Render</option>
                 <option value="github-pages" class="bg-black text-white">GitHub Pages</option>
               </optgroup>
               <optgroup label="Dynamic & Server-side" class="bg-black text-white">
@@ -1083,6 +1100,59 @@
             </div>
           </div>
           
+          <!-- Render Config -->
+          <div v-if="newProfile.adapter === 'render'" class="space-y-4 p-4 border border-gray-500/15 rounded-lg">
+            <h4 class="font-medium text-white">Render Configuration</h4>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">API Token *</label>
+              <input
+                v-model="newProfile.config.renderToken"
+                type="password"
+                required
+                autocomplete="new-password"
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+              />
+              <p class="text-xs text-gray-500 mt-1">Create at dashboard.render.com in the API tab</p>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Static Site ID</label>
+                <input
+                  v-model="newProfile.config.renderStaticSiteId"
+                  :required="!newProfile.config.renderServiceId"
+                  type="text"
+                  class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                  placeholder="static-srv-..."
+                />
+                <p class="text-xs text-gray-500 mt-1">For direct artifact uploads. Leave empty if using serviceId.</p>
+              </div>
+              
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Service ID</label>
+                <input
+                  v-model="newProfile.config.renderServiceId"
+                  :required="!newProfile.config.renderStaticSiteId"
+                  type="text"
+                  class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                  placeholder="srv-..."
+                />
+                <p class="text-xs text-gray-500 mt-1">Triggers repo-based deploys. Leave empty if using a static site.</p>
+              </div>
+            </div>
+            
+            <div v-if="newProfile.config.renderServiceId">
+              <label class="block text-sm text-gray-400 mb-1">Branch (optional)</label>
+              <input
+                v-model="newProfile.config.renderBranch"
+                type="text"
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="main"
+              />
+            </div>
+          </div>
+          
           <div v-if="createError" class="p-3 bg-red-500/10 text-red-500 rounded text-sm">
             {{ createError }}
           </div>
@@ -1196,6 +1266,11 @@ const newProfile = ref({
     accessToken: '',
     appName: '',
     org: '',
+    // Render
+    renderToken: '',
+    renderStaticSiteId: '',
+    renderServiceId: '',
+    renderBranch: 'main',
     // Cloudflare Sandbox
     runtime: 'node',
     buildCommand: 'npm run build',
@@ -1264,6 +1339,9 @@ const getAdapterIcon = (adapter: string) => {
     'fly': h('svg', { fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
       h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' }),
     ]),
+    'render': h('svg', { fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M4 7l8-4 8 4m-16 0v6a8 8 0 008 8 8 8 0 008-8V7M8 11.5l4 2.5 4-2.5' }),
+    ]),
     'ftp': h('svg', { fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
       h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12' }),
     ]),
@@ -1292,6 +1370,7 @@ const getAdapterColor = (adapter: string) => {
     'cloudflare-pages': 'text-yellow-300 bg-yellow-300/10 border-yellow-300/20',
     'railway': 'text-pink-300 bg-pink-300/10 border-pink-300/20',
     'fly': 'text-cyan-300 bg-cyan-300/10 border-cyan-300/20',
+    'render': 'text-amber-300 bg-amber-300/10 border-amber-300/20',
     'ftp': 'text-green-300 bg-green-300/10 border-green-300/20',
     'github-pages': 'text-gray-300 bg-gray-300/10 border-gray-300/20',
     'netlify': 'text-teal-300 bg-teal-300/10 border-teal-300/20',
@@ -1310,6 +1389,7 @@ const getAdapterLabel = (adapter: string) => {
     'cloudflare-pages': 'Cloudflare Pages',
     'railway': 'Railway',
     'fly': 'Fly.io',
+    'render': 'Render',
     'ftp': 'FTP',
     'github-pages': 'GitHub Pages',
     'netlify': 'Netlify',
@@ -1422,6 +1502,20 @@ const handleCreate = async () => {
       if (newProfile.value.config.productionDomain) {
         adapterConfig.productionDomain = newProfile.value.config.productionDomain;
       }
+    } else if (newProfile.value.adapter === 'render') {
+      adapterConfig = {
+        token: newProfile.value.config.renderToken,
+        staticSiteId: newProfile.value.config.renderStaticSiteId || undefined,
+        serviceId: newProfile.value.config.renderServiceId || undefined,
+      };
+      
+      if (!adapterConfig.staticSiteId && !adapterConfig.serviceId) {
+        throw new Error('Render profiles require either a Static Site ID or Service ID.');
+      }
+      
+      if (adapterConfig.serviceId && newProfile.value.config.renderBranch) {
+        adapterConfig.branch = newProfile.value.config.renderBranch;
+      }
     } else if (newProfile.value.adapter === 'cloudflare-sandbox') {
       adapterConfig = {
         accountId: newProfile.value.config.accountId,
@@ -1511,6 +1605,10 @@ const handleCreate = async () => {
         netlifyToken: '',
         netlifySiteId: '',
         netlifySiteName: '',
+        renderToken: '',
+        renderStaticSiteId: '',
+        renderServiceId: '',
+        renderBranch: 'main',
       },
     };
   } catch (error: any) {

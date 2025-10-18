@@ -2,98 +2,157 @@ import chalk from 'chalk';
 import { requireConfig } from '../config.js';
 import { ApiClient } from '@br/shared';
 
+interface CatalogEntry {
+  name: string;
+  title: string;
+  category: string;
+  description: string;
+  features?: string[];
+  docsUrl?: string;
+  supportsPreview?: boolean;
+  supportsProduction?: boolean;
+}
+
+const FALLBACK_ADAPTERS: CatalogEntry[] = [
+  {
+    name: 'ssh-rsync',
+    title: 'SSH + rsync',
+    category: 'traditional',
+    description: 'Deploy to private servers over SSH with release retention.',
+    features: ['Atomic deploys', 'Health checks'],
+  },
+  {
+    name: 'ftp',
+    title: 'FTP / FTPS',
+    category: 'traditional',
+    description: 'Upload static assets to shared hosting via FTP or FTPS.',
+  },
+  {
+    name: 's3',
+    title: 'Amazon S3 & Compatible',
+    category: 'storage',
+    description: 'Push static builds to S3, MinIO, or any S3-compatible storage.',
+    features: ['Release pointers'],
+  },
+  {
+    name: 'vercel',
+    title: 'Vercel',
+    category: 'platform',
+    description: 'Preview deployments and production promotion on Vercel.',
+    features: ['Preview URLs', 'Production promotion'],
+  },
+  {
+    name: 'cloudflare-pages',
+    title: 'Cloudflare Pages',
+    category: 'platform',
+    description: 'Global CDN deployments for static sites.',
+  },
+  {
+    name: 'netlify',
+    title: 'Netlify',
+    category: 'platform',
+    description: 'Jamstack deployments with build command support.',
+  },
+  {
+    name: 'railway',
+    title: 'Railway',
+    category: 'platform',
+    description: 'Trigger Railway deployments via GraphQL.',
+  },
+  {
+    name: 'fly',
+    title: 'Fly.io',
+    category: 'platform',
+    description: 'Run Dockerized applications close to your users.',
+  },
+  {
+    name: 'render',
+    title: 'Render',
+    category: 'platform',
+    description: 'Static artifacts and service redeploys on Render.com.',
+  },
+  {
+    name: 'github-pages',
+    title: 'GitHub Pages',
+    category: 'platform',
+    description: 'Publish repositories to GitHub Pages.',
+  },
+  {
+    name: 'cloudflare-sandbox',
+    title: 'Cloudflare Sandbox',
+    category: 'dynamic',
+    description: 'Sandboxed runtime on Cloudflare Workers.',
+  },
+  {
+    name: 'vercel-sandbox',
+    title: 'Vercel Sandbox',
+    category: 'dynamic',
+    description: 'Isolated environments on Vercel with runtime controls.',
+  },
+];
+
+function formatSupports(adapter: CatalogEntry): string | null {
+  const supports: string[] = [];
+  if (adapter.supportsPreview) supports.push('preview');
+  if (adapter.supportsProduction ?? true) supports.push('production');
+  return supports.length > 0 ? supports.join(' + ') : null;
+}
+
+function printAdapter(adapter: CatalogEntry) {
+  console.log(chalk.cyan.bold(adapter.title || adapter.name));
+
+  if (adapter.description) {
+    console.log(chalk.dim(`  ${adapter.description}\n`));
+  }
+
+  console.log(chalk.bold('  Category:'), adapter.category);
+
+  if (adapter.features?.length) {
+    console.log(chalk.bold('  Highlights:'));
+    adapter.features.forEach((feature) => {
+      console.log(`    • ${feature}`);
+    });
+  }
+
+  const supports = formatSupports(adapter);
+  if (supports) {
+    console.log(chalk.bold('  Supports:'), supports);
+  }
+
+  if (adapter.docsUrl) {
+    console.log(chalk.dim(`  Docs: ${adapter.docsUrl}`));
+  }
+
+  console.log();
+}
+
 /**
  * List available adapters
  */
 export async function adaptersCommand() {
   console.log(chalk.bold('\n📦 Available Adapters\n'));
 
-  // Hardcoded for now - in a real implementation, these would come from the API
-  const adapters = [
-    {
-      name: 'ssh-rsync',
-      description: 'Deploy to VPS/dedicated servers via SSH+rsync',
-      fields: [
-        'host (string, required) - SSH hostname',
-        'port (number, default: 22) - SSH port',
-        'user (string, required) - SSH username',
-        'privateKey (string, required) - SSH private key (PEM format)',
-        'basePath (string, required) - Remote base path (e.g., /var/www/my-site)',
-        'keepReleases (number, default: 5) - Number of releases to keep',
-        'health.mode (enum: url|canary) - Health check mode',
-        'health.url (string) - URL to poll for health check',
-        'health.canaryPath (string) - URL to canary file',
-        'health.timeoutMs (number, default: 8000) - Health check timeout',
-        'health.retries (number, default: 5) - Health check retries',
-      ],
-    },
-    {
-      name: 's3',
-      description: 'Deploy to S3-compatible storage (AWS, Cloudflare R2, etc.)',
-      fields: [
-        'endpoint (string, optional) - S3 endpoint URL',
-        'region (string, required) - AWS region',
-        'bucket (string, required) - S3 bucket name',
-        'prefix (string, required) - Object key prefix',
-        'accessKeyId (string, required) - AWS access key ID',
-        'secretAccessKey (string, required) - AWS secret access key',
-        'forcePathStyle (boolean, default: false) - Use path-style URLs',
-        'keepReleases (number, default: 5) - Number of releases to keep',
-      ],
-    },
-    {
-      name: 'vercel',
-      description: 'Deploy to Vercel (preview & production deployments)',
-      fields: [
-        'token (string, required) - Vercel API token',
-        'teamId (string, optional) - Vercel team ID',
-        'projectId (string, optional) - Vercel project ID (auto-created if omitted)',
-        'projectName (string, optional) - Vercel project name',
-        'framework (enum: static|nextjs|other, default: static) - Framework type',
-        'productionDomain (string, optional) - Production domain',
-      ],
-    },
-    {
-      name: 'cloudflare-pages',
-      description: 'Deploy to Cloudflare Pages (preview & production)',
-      fields: [
-        'accountId (string, required) - Cloudflare account ID',
-        'apiToken (string, required) - Cloudflare API token',
-        'projectName (string, optional) - Pages project name (auto-created if omitted)',
-        'productionDomain (string, optional) - Custom production domain',
-      ],
-    },
-    {
-      name: 'railway',
-      description: 'Deploy to Railway via GraphQL API',
-      fields: [
-        'token (string, required) - Railway API token',
-        'projectId (string, required) - Railway project ID',
-        'environmentId (string, required) - Railway environment ID',
-        'serviceName (string, optional) - Service name (default: static-site)',
-      ],
-    },
-    {
-      name: 'fly',
-      description: 'Deploy to Fly.io with Docker containers',
-      fields: [
-        'accessToken (string, required) - Fly.io access token',
-        'appName (string, optional) - Fly.io app name (auto-generated if omitted)',
-        'org (string, optional) - Fly.io organization (default: personal)',
-      ],
-    },
-  ];
+  let adapters: CatalogEntry[] = FALLBACK_ADAPTERS;
 
-  for (const adapter of adapters) {
-    console.log(chalk.cyan.bold(`${adapter.name}`));
-    console.log(chalk.dim(`  ${adapter.description}\n`));
-    console.log(chalk.bold('  Configuration:'));
-    for (const field of adapter.fields) {
-      console.log(`    • ${field}`);
+  try {
+    const config = await requireConfig();
+    const api = new ApiClient({ baseUrl: config.apiUrl, token: config.token });
+    const remote = await api.fetch<CatalogEntry[]>('/v1/catalog/adapters');
+
+    if (Array.isArray(remote) && remote.length > 0) {
+      adapters = remote;
     }
-    console.log();
+  } catch (error: any) {
+    console.log(chalk.dim(`Using bundled catalog: ${error?.message || error}`));
   }
 
-  console.log(chalk.dim('Use "br profiles add --adapter <name>" to create a profile\n'));
+  adapters
+    .slice()
+    .sort((a, b) => (a.title || a.name).localeCompare(b.title || b.name))
+    .forEach(printAdapter);
+
+  console.log(
+    chalk.dim('Use "br profiles add --adapter <name>" to create a profile\n'),
+  );
 }
 

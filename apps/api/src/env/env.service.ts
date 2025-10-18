@@ -14,6 +14,7 @@ const VALID_SCOPES = [
   'adapter:netlify',
   'adapter:railway',
   'adapter:fly',
+  'adapter:render',
   'adapter:s3',
   'adapter:github-pages',
   'adapter:ftp',
@@ -457,4 +458,3 @@ export class EnvService {
     return result.count;
   }
 }
-

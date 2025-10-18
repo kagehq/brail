@@ -31,6 +31,7 @@ model Org {
 
   // Relations
   members OrgMember[]
+  invites OrgInvite[]
   sites   Site[]
 }
 
@@ -39,6 +40,8 @@ model OrgMember {
   userId String
   orgId  String
   role   String @default("member") // owner, admin, member
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -46,6 +49,25 @@ model OrgMember {
   @@unique([userId, orgId])
   @@index([userId])
   @@index([orgId])
+}
+
+model OrgInvite {
+  id          String   @id @default(cuid())
+  orgId       String
+  email       String
+  role        String   @default("member") // owner, admin, member
+  status      String   @default("pending") // pending, accepted, cancelled, expired
+  token       String   @unique
+  invitedBy   String?
+  respondedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, email])
+  @@index([orgId])
+  @@index([email, status])
 }
 
 // ============================================================================

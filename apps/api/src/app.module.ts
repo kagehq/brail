@@ -21,6 +21,8 @@ import { BuildModule } from './build/build.module';
 import { BuildLogsModule } from './build-logs/build-logs.module';
 import { SslModule } from './ssl/ssl.module';
 import { EnvModule } from './env/env.module';
+import { OrgsModule } from './orgs/orgs.module';
+import { AdapterCatalogModule } from './catalog/adapter-catalog.module';
 
 @Module({
   imports: [
@@ -45,8 +47,9 @@ import { EnvModule } from './env/env.module';
     BuildLogsModule,
     SslModule,
     EnvModule,
+    OrgsModule,
+    AdapterCatalogModule,
     PublicModule,
   ],
 })
 export class AppModule {}
-

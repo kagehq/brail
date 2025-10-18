@@ -6,7 +6,7 @@
 
 ## Features
 
-- Deploy to your own servers (SSH/FTP), S3, or platforms (Vercel/Netlify/Railway)
+- Deploy to your own servers (SSH/FTP), S3, or platforms (Vercel/Netlify/Railway/Render)
 - **Dynamic sites** with Cloudflare Sandbox & Vercel Sandbox (AI-powered, interactive playgrounds)
 - Zero downtime deployments with instant rollbacks
 - Auto-detect and build Next.js, Astro, Vite, Nuxt, SvelteKit
@@ -14,6 +14,7 @@
 - Custom domains with auto-SSL via Let's Encrypt
 - Replace single files without full redeploy
 - Drag & drop UI + powerful CLI
+- Remote adapter catalog discoverable from CLI and dashboard
 
 ## Community & Support
 
@@ -103,10 +104,11 @@ Manage environment variables through the web interface:
 - **Cloudflare Sandbox** - Edge computing with global distribution
 - **Vercel Sandbox** - Enterprise-grade sandbox with superior observability
 
-**Platforms (2):**
+**Platforms (3):**
 
 - **Railway** - Deploy to Railway platform
 - **Fly.io** - Deploy to Fly.io platform
+- **Render** - Deploy to Render static sites or services
 
 ## Custom Adapters
 

@@ -59,6 +59,8 @@ export class AuthService {
       });
     }
 
+    await this.acceptPendingInvites(user);
+
     return user;
   }
 
@@ -140,5 +142,49 @@ export class AuthService {
     }
     return token;
   }
-}
 
+  /**
+   * Attach user to any pending organization invites matching their email
+   */
+  private async acceptPendingInvites(user: { id: string; email: string }) {
+    const invites = await this.prisma.orgInvite.findMany({
+      where: {
+        email: user.email,
+        status: 'pending',
+      },
+    });
+
+    if (invites.length === 0) {
+      return;
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const invite of invites) {
+        const membership = await tx.orgMember.findFirst({
+          where: {
+            orgId: invite.orgId,
+            userId: user.id,
+          },
+        });
+
+        if (!membership) {
+          await tx.orgMember.create({
+            data: {
+              orgId: invite.orgId,
+              userId: user.id,
+              role: invite.role,
+            },
+          });
+        }
+
+        await tx.orgInvite.update({
+          where: { id: invite.id },
+          data: {
+            status: 'accepted',
+            respondedAt: new Date(),
+          },
+        });
+      }
+    });
+  }
+}

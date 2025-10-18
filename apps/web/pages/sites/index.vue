@@ -10,15 +10,29 @@
           <h1 class="text-3xl font-bold text-white mb-1">Your Sites</h1>
           <p class="text-gray-500 text-sm">Manage and deploy your static sites</p>
         </div>
-        <button
-          @click="showCreateModal = true"
-          class="bg-blue-300 text-sm font-semibold text-black px-5 py-2.5 rounded-lg hover:bg-blue-400 transition-all hover:shadow-lg hover:shadow-blue-300/20 hover:scale-105 flex items-center gap-2"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
-          </svg>
-          Create Site
-        </button>
+        <div class="flex items-center gap-3">
+          <NuxtLink
+            to="/adapters"
+            class="px-4 py-2 text-sm font-semibold text-gray-300 border border-gray-500/30 rounded-lg hover:text-white hover:border-gray-500/50 transition-all"
+          >
+            Adapter Catalog
+          </NuxtLink>
+          <NuxtLink
+            to="/settings/team"
+            class="px-4 py-2 text-sm font-semibold text-gray-300 border border-gray-500/30 rounded-lg hover:text-white hover:border-gray-500/50 transition-all"
+          >
+            Team Access
+          </NuxtLink>
+          <button
+            @click="showCreateModal = true"
+            class="bg-blue-300 text-sm font-semibold text-black px-5 py-2.5 rounded-lg hover:bg-blue-400 transition-all hover:shadow-lg hover:shadow-blue-300/20 hover:scale-105 flex items-center gap-2"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+            </svg>
+            Create Site
+          </button>
+        </div>
       </div>
       
       <!-- Loading Skeleton -->
@@ -258,4 +272,3 @@ const formatRelativeTime = (date: string | Date) => {
   return `${Math.floor(diffDays / 365)}y ago`;
 };
 </script>
-

@@ -1,6 +1,6 @@
 # Brail Platform Connectors
 
-This guide covers deploying to cloud platforms and services via Brail's adapters: **SSH/Rsync**, **S3**, **FTP**, **Vercel**, **Cloudflare Pages**, **Netlify**, **Railway**, **Fly.io**, **GitHub Pages**, **Cloudflare Sandbox**, and **Vercel Sandbox**.
+This guide covers deploying to cloud platforms and services via Brail's adapters: **SSH/Rsync**, **S3**, **FTP**, **Vercel**, **Cloudflare Pages**, **Netlify**, **Railway**, **Fly.io**, **Render**, **GitHub Pages**, **Cloudflare Sandbox**, and **Vercel Sandbox**.
 
 ## Overview
 
@@ -254,6 +254,46 @@ br profiles add \
   --appName my-website
 ```
 
+### Render Adapter
+
+Deploy to Render for static sites (artifact upload) or web services (repo-based deploys).
+
+#### Prerequisites
+
+1. **Render account**: Sign up at [render.com](https://render.com)
+2. **API token**: Generate from the Render dashboard API tab
+3. **Project setup**: Create a static site or service to target
+
+#### Configuration
+
+```bash
+# Static site (direct artifact upload)
+br profiles add \
+  --site <siteId> \
+  --name render-static \
+  --adapter render \
+  --token @~/.secrets/render.token \
+  --staticSiteId <render-static-site-id>
+
+# Web service (trigger deploy from repository)
+br profiles add \
+  --site <siteId> \
+  --name render-service \
+  --adapter render \
+  --token @~/.secrets/render.token \
+  --serviceId <render-service-id> \
+  --branch main
+```
+
+**Config Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `token` | ✅ | Render API token |
+| `staticSiteId` | ✅* | Render static site ID for artifact uploads (*required if `serviceId` omitted*) |
+| `serviceId` | ✅* | Render service ID for repo-based deploys (*required if `staticSiteId` omitted*) |
+| `branch` | ❌ | Branch to deploy when using `serviceId` (default: service default) |
+
 ### GitHub Pages Adapter
 
 Deploy to GitHub Pages with automatic builds from repository.
@@ -353,17 +393,17 @@ br profiles add \
 
 ## Comparison Table
 
-| Feature | Vercel | Cloudflare Pages | Railway | Fly.io | Cloudflare Sandbox | Vercel Sandbox |
-|---------|--------|------------------|---------|--------|-------------------|----------------|
-| **Status** | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA |
-| **Preview URLs** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Production Promotion** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Rollback** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Config Mapping** | ✅ vercel.json | ✅ _headers/_redirects | ✅ railway.json | ✅ fly.toml | ✅ wrangler.toml | ✅ vercel.json |
-| **Custom Domains** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Edge Locations** | Global | Global | Regional | Multi-region | Global | Global |
-| **Dynamic Code** | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| **Runtime Support** | Static | Static | Static | Static | Node/Python/Deno | Node22/Python313 |
+| Feature | Vercel | Cloudflare Pages | Railway | Fly.io | Render | Cloudflare Sandbox | Vercel Sandbox |
+|---------|--------|------------------|---------|--------|--------|-------------------|----------------|
+| **Status** | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA |
+| **Preview URLs** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Production Promotion** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Rollback** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Config Mapping** | ✅ vercel.json | ✅ _headers/_redirects | ✅ railway.json | ✅ fly.toml | ✅ render.yaml | ✅ wrangler.toml | ✅ vercel.json |
+| **Custom Domains** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Edge Locations** | Global | Global | Regional | Multi-region | Regional | Global | Global |
+| **Dynamic Code** | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| **Runtime Support** | Static | Static | Static | Static | Static/Services | Node/Python/Deno | Node22/Python313 |
 
 ## Common Patterns
 
@@ -439,7 +479,7 @@ br drop ./dist --site abc --profile vercel-sandbox
 
 ### Preview URL not appearing
 
-- Ensure adapter supports preview URLs (Vercel, Cloudflare Pages, Netlify, Railway, Fly.io)
+- Ensure adapter supports preview URLs (Vercel, Cloudflare Pages, Netlify, Railway, Fly.io, Render)
 - Check API response in logs for error messages
 
 ### Sandbox deployment issues
@@ -459,5 +499,5 @@ br drop ./dist --site abc --profile vercel-sandbox
 ---
 
 **Adapter Status**: 
-- ✅ **Production Ready**: SSH/Rsync, S3, FTP, Vercel, Cloudflare Pages, Netlify, Railway, Fly.io, GitHub Pages, Cloudflare Sandbox, Vercel Sandbox
-- 🚀 **Total Adapters**: 11 built-in adapters for all deployment scenarios
+- ✅ **Production Ready**: SSH/Rsync, S3, FTP, Vercel, Cloudflare Pages, Netlify, Railway, Fly.io, Render, GitHub Pages, Cloudflare Sandbox, Vercel Sandbox
+- 🚀 **Total Adapters**: 12 built-in adapters for all deployment scenarios

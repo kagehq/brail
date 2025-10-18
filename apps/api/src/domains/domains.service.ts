@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { isFQDN, verifyCNAME, buildCnameInstruction } from '@br/domain-utils';
+import { SslService } from '../ssl/ssl.service';
 
 @Injectable()
 export class DomainsService {
   private readonly logger = new Logger(DomainsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sslService: SslService,
+  ) {}
 
   /**
    * Add a custom domain to a site
@@ -105,7 +109,7 @@ export class DomainsService {
       },
     });
 
-    // If verified and ACME is enabled, kick off SSL provisioning (stub)
+    // If verified and ACME is enabled, kick off SSL provisioning
     if (verification.ok && process.env.ACME_AUTO_SSL === 'true') {
       this.logger.log(`Domain verified, queuing SSL certificate for ${domain.hostname}`);
       await this.requestCertificate(domainId);
@@ -140,19 +144,17 @@ export class DomainsService {
       throw new BadRequestException('Domain must be verified before requesting SSL');
     }
 
-    // Update cert status to pending
-    await this.prisma.domain.update({
-      where: { id: domainId },
-      data: {
-        certProvider: 'acme',
-        certStatus: 'pending',
-        status: 'securing',
-      },
-    });
+    this.logger.log(`Scheduling SSL provisioning for ${domain.hostname}`);
 
-    // TODO: Enqueue ACME job (integrate with Let's Encrypt later)
-    // For now, this is a stub
-    this.logger.log(`SSL certificate request queued for ${domain.hostname}`);
+    this.sslService
+      .provisionCertificate(domainId)
+      .then(() => {
+        this.logger.log(`SSL provisioning completed for ${domain.hostname}`);
+      })
+      .catch((error: any) => {
+        const message = error?.message || String(error);
+        this.logger.error(`Failed to provision certificate for ${domain.hostname}: ${message}`);
+      });
 
     return { queued: true };
   }

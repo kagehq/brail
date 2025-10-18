@@ -10,6 +10,7 @@ import { GitHubPagesAdapter } from './github-pages.adapter.js';
 import { NetlifyAdapter } from './netlify.adapter.js';
 import { CloudflareSandboxAdapter } from './cloudflare-sandbox.adapter.js';
 import { vercelSandboxAdapter } from './vercel-sandbox.adapter.js';
+import { RenderAdapter } from './render.adapter.js';
 
 export * from './types.js';
 export { SshRsyncAdapter } from './sshRsync.adapter.js';
@@ -23,6 +24,7 @@ export { GitHubPagesAdapter } from './github-pages.adapter.js';
 export { NetlifyAdapter } from './netlify.adapter.js';
 export { CloudflareSandboxAdapter } from './cloudflare-sandbox.adapter.js';
 export { vercelSandboxAdapter } from './vercel-sandbox.adapter.js';
+export { RenderAdapter } from './render.adapter.js';
 
 /**
  * Global adapter registry
@@ -60,8 +62,8 @@ adapterRegistry.register(new NetlifyAdapter());
 adapterRegistry.register(new RailwayAdapter());
 adapterRegistry.register(new FlyAdapter());
 adapterRegistry.register(new GitHubPagesAdapter());
+adapterRegistry.register(new RenderAdapter());
 
 // Phase 4 adapters - Dynamic/Server-side processing
 adapterRegistry.register(new CloudflareSandboxAdapter());
 adapterRegistry.register(vercelSandboxAdapter);
-
