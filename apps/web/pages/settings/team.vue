@@ -70,7 +70,7 @@
                     v-model="memberRoles[member.id]"
                     @change="() => handleRoleChange(member)"
                     :disabled="!canManage || memberAction === member.id || (!isOwner && member.role === 'owner')"
-                    class="appearance-none bg-gray-500/10 border border-gray-500/30 text-sm text-white px-3 py-2 pr-9 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="appearance-none text-sm bg-gray-500/10 border border-gray-500/30 text-sm text-white px-3 py-2 pr-9 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300/40 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option
                       v-for="option in availableMemberRoles"
@@ -160,19 +160,35 @@
               :key="invite.id"
               class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-gray-500/10 border border-gray-500/20 rounded-lg px-4 py-3"
             >
-              <div>
+              <div class="space-y-1">
                 <p class="text-sm font-semibold text-white">{{ invite.email }}</p>
                 <p class="text-xs text-gray-500">
                   Invited {{ formatDate(invite.createdAt) }} • Role: {{ roleLabel(invite.role) }}
                 </p>
+                <div v-if="invite.token" class="text-xs text-gray-500 flex flex-col gap-1">
+                  <span class="font-semibold text-gray-400 uppercase tracking-wide">Invite Token</span>
+                  <span class="inline-flex items-center gap-2 font-mono text-[11px] bg-gray-500/10 border border-gray-500/20 rounded px-2 py-1 break-all">
+                    {{ invite.token }}
+                  </span>
+                </div>
               </div>
-              <button
-                @click="cancelInvite(invite)"
-                :disabled="!canManage || inviteAction === invite.id"
-                class="px-3 py-2 text-xs font-semibold text-gray-300 border border-gray-500/30 rounded-lg hover:bg-gray-500/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {{ inviteAction === invite.id ? 'Cancelling...' : 'Cancel Invite' }}
-              </button>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="invite.token"
+                  @click="copyInviteToken(invite)"
+                  :disabled="!canManage || copiedInviteId === invite.id"
+                  class="px-3 py-2 text-xs font-semibold text-blue-300 border border-blue-300/20 rounded-lg hover:bg-blue-300/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {{ copiedInviteId === invite.id ? 'Copied!' : 'Copy Token' }}
+                </button>
+                <button
+                  @click="cancelInvite(invite)"
+                  :disabled="!canManage || inviteAction === invite.id"
+                  class="px-3 py-2 text-xs font-semibold text-gray-300 border border-gray-500/30 rounded-lg hover:bg-gray-500/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {{ inviteAction === invite.id ? 'Cancelling...' : 'Cancel Invite' }}
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -198,6 +214,7 @@ const inviting = ref(false);
 const memberRoles = reactive<Record<string, string>>({});
 const memberAction = ref<string | null>(null);
 const inviteAction = ref<string | null>(null);
+const copiedInviteId = ref<string | null>(null);
 
 const canManage = computed(() => {
   const role = org.value?.currentMember?.role;
@@ -265,6 +282,7 @@ async function loadOrg(showSpinner = false) {
     const data = await response.json();
     org.value = data;
     resetMemberRoles();
+    copiedInviteId.value = null;
   } catch (error) {
     org.value = null;
     toast.apiError(error);
@@ -427,6 +445,39 @@ async function cancelInvite(invite: any) {
     toast.apiError(error);
   } finally {
     inviteAction.value = null;
+  }
+}
+
+async function copyInviteToken(invite: any) {
+  if (!invite.token) {
+    return;
+  }
+
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(invite.token);
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = invite.token;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+
+    copiedInviteId.value = invite.id;
+    toast.success('Invite token copied', 'Share this token with your teammate to accept the invite.');
+
+    window.setTimeout(() => {
+      if (copiedInviteId.value === invite.id) {
+        copiedInviteId.value = null;
+      }
+    }, 2000);
+  } catch (error) {
+    console.error('Failed to copy invite token:', error);
+    toast.error('Copy failed', 'Unable to copy invite token to clipboard.');
   }
 }
 

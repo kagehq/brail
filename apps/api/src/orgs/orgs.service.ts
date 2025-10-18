@@ -331,6 +331,7 @@ export class OrgsService {
       status: invite.status,
       invitedBy: invite.invitedBy || null,
       createdAt: invite.createdAt,
+      token: invite.status === 'pending' ? invite.token : null,
     };
   }
 
@@ -338,4 +339,3 @@ export class OrgsService {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
 }
-
