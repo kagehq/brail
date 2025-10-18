@@ -589,11 +589,27 @@ const badgeHtml = computed(() => {
 });
 
 const loadSite = async () => {
-  site.value = await api.getSite(siteId);
+  try {
+    site.value = await api.getSite(siteId);
+  } catch (error: any) {
+    if (error.status === 401) {
+      router.push('/login');
+      return;
+    }
+    throw error;
+  }
 };
 
 const loadDeploys = async () => {
-  deploys.value = await api.listDeploys(siteId);
+  try {
+    deploys.value = await api.listDeploys(siteId);
+  } catch (error: any) {
+    if (error.status === 401) {
+      router.push('/login');
+      return;
+    }
+    throw error;
+  }
 };
 
 const loadReleases = async () => {
@@ -603,6 +619,10 @@ const loadReleases = async () => {
         'Authorization': `Bearer ${api.getToken()}`,
       },
     });
+    if (response.status === 401) {
+      router.push('/login');
+      return;
+    }
     if (response.ok) {
       releases.value = await response.json();
     }
