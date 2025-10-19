@@ -17,7 +17,6 @@ import { LogsModule } from './logs/logs.module';
 import { PatchesModule } from './patches/patches.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditModule } from './audit/audit.module';
-import { BuildModule } from './build/build.module';
 import { BuildLogsModule } from './build-logs/build-logs.module';
 import { SslModule } from './ssl/ssl.module';
 import { EnvModule } from './env/env.module';
@@ -43,7 +42,6 @@ import { AdapterCatalogModule } from './catalog/adapter-catalog.module';
     PatchesModule,
     NotificationsModule,
     AuditModule,
-    BuildModule,
     BuildLogsModule,
     SslModule,
     EnvModule,
