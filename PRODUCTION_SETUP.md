@@ -18,12 +18,35 @@
 DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
 ```
 
-### Run Migrations
+### Run Migrations (Automated)
+```bash
+# Set your Supabase DATABASE_URL
+export DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres"
+
+# Run automated migration script
+node scripts/migrate-to-supabase.js
+```
+
+### Manual Migration (Alternative)
 ```bash
 # Update your DATABASE_URL in apps/api/.env
 cd apps/api
 pnpm prisma migrate deploy
 ```
+
+### Supabase Auth Options
+
+**Option A: Keep Current Auth (Recommended)**
+- ✅ Faster migration
+- ✅ No breaking changes
+- ✅ Current magic link system works
+
+**Option B: Use Supabase Auth**
+- ✅ Social authentication
+- ✅ Better security features
+- ❌ Requires more changes
+
+See `SUPABASE_MIGRATION.md` for detailed auth migration options.
 
 ## 2. DigitalOcean Spaces Setup
 
