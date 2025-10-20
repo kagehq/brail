@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@br/shared": "workspace:*",
+    "@oxc-parser/binding-linux-x64-gnu": "^0.43.0",
     "canvas-confetti": "^1.9.3",
     "jszip": "^3.10.1",
     "nuxt": "^3.9.0",
