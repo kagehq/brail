@@ -1,15 +1,18 @@
-# Use Node.js 22 Alpine
-FROM node:22-alpine AS base
+# Brail Production Dockerfile
+FROM node:22-alpine
 
-# Install pnpm and Python for native builds
-RUN apk add --no-cache python3 make g++ && \
-    corepack enable && corepack prepare pnpm@8.15.0 --activate
+# Install build dependencies for native modules
+RUN apk add --no-cache python3 make g++
 
-# Set working directory
+# Enable pnpm
+RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+
 WORKDIR /app
 
-# Copy package files
+# Copy workspace configuration
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Copy all package.json files
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/adapters/package.json ./packages/adapters/
 COPY packages/domain-utils/package.json ./packages/domain-utils/
@@ -19,21 +22,20 @@ COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY apps/cli/package.json ./apps/cli/
 
-# Install dependencies
+# Install all dependencies
 RUN pnpm install --no-frozen-lockfile
 
-# Copy source code
+# Copy source files
 COPY . .
 
-# Build workspace packages
-RUN pnpm --filter @br/shared build && \
-    pnpm --filter @br/adapters build && \
-    pnpm --filter @br/domain-utils build && \
-    pnpm --filter @br/frameworks build
+# Build workspace dependencies
+RUN pnpm --filter @br/shared build
+RUN pnpm --filter @br/adapters build
+RUN pnpm --filter @br/domain-utils build
+RUN pnpm --filter @br/frameworks build
 
-# Expose port
+# Expose default port
 EXPOSE 3000
 
-# Default command (can be overridden per service)
+# Start command
 CMD ["pnpm", "start"]
-
