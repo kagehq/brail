@@ -1,0 +1,11 @@
+node_modules
+.nuxt
+.output
+dist
+.turbo
+.git
+.env
+*.log
+dev.log
+tsc.log
+
