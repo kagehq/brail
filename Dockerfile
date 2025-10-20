@@ -1,8 +1,8 @@
 # Brail Production Dockerfile
 FROM node:22-alpine
 
-# Install build dependencies for native modules
-RUN apk add --no-cache python3 make g++
+# Install build dependencies for native modules and Prisma requirements
+RUN apk add --no-cache python3 make g++ openssl1.1-compat
 
 # Enable pnpm
 RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
