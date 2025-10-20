@@ -1,4 +1,5 @@
 # Brail Production Dockerfile
+# Build version: 2025-10-20-v4
 FROM node:22-alpine
 
 # Install build dependencies for native modules and Prisma requirements
