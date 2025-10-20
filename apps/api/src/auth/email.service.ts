@@ -61,20 +61,11 @@ export class EmailService {
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #000000;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td align="center" style="padding: 40px 0;">
-        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse;">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 30px; text-align: center; background-color: #000000;">
-              <h1 style="margin: 0; font-size: 32px; font-weight: bold; color: #ffffff;">
-                🚀 Brail
-              </h1>
-            </td>
-          </tr>
-          
+      <td align="center" style="padding: 20px 0;">
+        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse;">   
           <!-- Body -->
           <tr>
-            <td style="padding: 40px 30px; background-color: #111111; border-radius: 8px;">
+            <td>
               <h2 style="margin: 0 0 20px 0; font-size: 24px; font-weight: 600; color: #ffffff;">
                 Sign in to your account
               </h2>
@@ -86,7 +77,7 @@ export class EmailService {
               <table role="presentation" style="margin: 0 0 30px 0;">
                 <tr>
                   <td>
-                    <a href="${magicLink}" style="display: inline-block; padding: 14px 32px; background-color: #60a5fa; color: #000000; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
+                    <a href="${magicLink}" style="display: inline-block; padding: 14px 32px; background-color: #93c5fd; color: #000000; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px;">
                       Sign in to Brail
                     </a>
                   </td>
@@ -97,20 +88,8 @@ export class EmailService {
                 Or copy and paste this link into your browser:
               </p>
               
-              <p style="margin: 0; padding: 12px; background-color: #1c1c1c; border: 1px solid #27272a; border-radius: 6px; font-size: 13px; color: #60a5fa; word-break: break-all;">
+              <p style="margin: 0; padding: 12px; background-color: #1c1c1c; border: 1px solid #27272a; border-radius: 6px; font-size: 13px; color: #93c5fd; word-break: break-all;">
                 ${magicLink}
-              </p>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 30px; text-align: center; background-color: #000000;">
-              <p style="margin: 0; font-size: 14px; color: #71717a;">
-                If you didn't request this email, you can safely ignore it.
-              </p>
-              <p style="margin: 10px 0 0 0; font-size: 12px; color: #52525b;">
-                © ${new Date().getFullYear()} Brail. All rights reserved.
               </p>
             </td>
           </tr>
