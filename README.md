@@ -29,7 +29,7 @@ Join our Discord community for discussions, support, and updates:
 pnpm install
 
 # Start infrastructure (Postgres + MinIO)
-docker-compose up -d
+docker compose up -d
 
 # Generate encryption key for secrets
 node scripts/generate-key.js

@@ -16,7 +16,7 @@ fi
 
 # Start infrastructure
 echo "📦 Starting infrastructure (Postgres + MinIO)..."
-docker-compose up -d
+docker compose up -d
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to be ready..."

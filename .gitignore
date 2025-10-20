@@ -31,3 +31,4 @@ coverage
 .turbo
 .cache
 
+apps/web/.env
