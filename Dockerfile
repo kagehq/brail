@@ -34,6 +34,10 @@ RUN pnpm --filter @br/adapters build
 RUN pnpm --filter @br/domain-utils build
 RUN pnpm --filter @br/frameworks build
 
+# Build applications
+RUN pnpm --filter @br/api build
+RUN pnpm --filter @br/web build
+
 # Expose default port
 EXPOSE 3000
 
