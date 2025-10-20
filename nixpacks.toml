@@ -1,0 +1,16 @@
+[phases.setup]
+nixPkgs = ["nodejs_22", "pnpm-8_x", "openssl", "python311"]
+
+[phases.install]
+cmds = [
+  "npm install -g corepack@0.24.1 && corepack enable",
+  "rm -rf node_modules",
+  "pnpm i --no-frozen-lockfile"
+]
+
+[phases.build]
+cmds = ["pnpm --filter @br/web build"]
+
+[start]
+cmd = "pnpm start"
+
