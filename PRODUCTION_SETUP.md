@@ -1,140 +1,128 @@
-# 🚀 Brail Production Setup Guide
+# 🚀 Production Setup
 
-## Infrastructure Stack
-- **Database**: Supabase (PostgreSQL + real-time + auth)
+## Infrastructure
+- **Database**: Supabase (PostgreSQL)
 - **Storage**: DigitalOcean Spaces (S3-compatible)
-- **Hosting**: Railway (full-stack deployment)
+- **Hosting**: Railway (Dockerized)
+- **Email**: Resend (magic link authentication)
 
-## 1. Supabase Setup
+## 1. Supabase Database
 
-### Create Supabase Project
-1. Go to [supabase.com](https://supabase.com)
-2. Create new project
-3. Note your database URL and API keys
+1. Create a project at [supabase.com](https://supabase.com)
+2. Go to **Project Settings → Database → Connection Pooling**
+3. Copy the **Transaction mode** connection string (required for Railway)
 
-### Database Configuration
 ```bash
-# Your Supabase database URL will look like:
-DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
+# ⚠️ Use the Connection Pooler URL (not direct connection)
+DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true
 ```
 
-### Run Migrations (Automated)
+4. Apply the database schema:
+   - Go to **SQL Editor** in Supabase
+   - Run the migration SQL (see `apps/api/prisma/schema.prisma` or generate with `pnpm prisma migrate dev`)
+
+## 2. DigitalOcean Spaces
+
+1. Create a Space at [DigitalOcean](https://cloud.digitalocean.com/spaces)
+2. Generate API keys with Spaces access
+
 ```bash
-# Set your Supabase DATABASE_URL
-export DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres"
-
-# Run automated migration script
-node scripts/migrate-to-supabase.js
-```
-
-### Manual Migration (Alternative)
-```bash
-# Update your DATABASE_URL in apps/api/.env
-cd apps/api
-pnpm prisma migrate deploy
-```
-
-### Supabase Auth Options
-
-**Option A: Keep Current Auth (Recommended)**
-- ✅ Faster migration
-- ✅ No breaking changes
-- ✅ Current magic link system works
-
-**Option B: Use Supabase Auth**
-- ✅ Social authentication
-- ✅ Better security features
-- ❌ Requires more changes
-
-See `SUPABASE_MIGRATION.md` for detailed auth migration options.
-
-## 2. DigitalOcean Spaces Setup
-
-### Create Spaces Bucket
-1. Go to [DigitalOcean Spaces](https://cloud.digitalocean.com/spaces)
-2. Create new Space in `nyc3` region
-3. Generate API keys with Spaces access
-
-### Configuration
-```bash
-S3_ENDPOINT=https://nyc3.digitaloceanspaces.com
-S3_REGION=nyc3
-S3_BUCKET=brail-deploys
+S3_ENDPOINT=https://[region].digitaloceanspaces.com
+S3_REGION=sfo3  # or your region
+S3_BUCKET=your-bucket-name
 S3_ACCESS_KEY=[YOUR_ACCESS_KEY]
 S3_SECRET_KEY=[YOUR_SECRET_KEY]
 S3_FORCE_PATH_STYLE=false
 ```
 
-## 3. Railway Deployment
+## 3. Resend Email
 
-### Deploy to Railway
-1. Connect your GitHub repo to Railway
-2. Set environment variables (see below)
-3. Deploy both API and Web services
+1. Sign up at [resend.com](https://resend.com)
+2. Create an API key
+
+```bash
+RESEND_API_KEY=re_xxxxxxxxxxxxx
+FROM_EMAIL=noreply@yourdomain.com
+```
+
+## 4. Railway Deployment
 
 ### Required Environment Variables
+
+**API Service:**
 ```bash
-# Database
-DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
+# Database (Connection Pooler!)
+DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true
 
 # Storage
-S3_ENDPOINT=https://nyc3.digitaloceanspaces.com
-S3_REGION=nyc3
-S3_BUCKET=brail-deploys
-S3_ACCESS_KEY=[DO_SPACES_ACCESS_KEY]
-S3_SECRET_KEY=[DO_SPACES_SECRET_KEY]
+S3_ENDPOINT=https://[region].digitaloceanspaces.com
+S3_REGION=sfo3
+S3_BUCKET=your-bucket-name
+S3_ACCESS_KEY=[DO_ACCESS_KEY]
+S3_SECRET_KEY=[DO_SECRET_KEY]
 S3_FORCE_PATH_STYLE=false
 
-# Security
-SECRET_KEY_256=[32_BYTE_HEX_KEY]
-ENCRYPTION_KEY=[ENCRYPTION_KEY]
+# Security (generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+SECRET_KEY_256=[32_BYTE_HEX]
+ENCRYPTION_KEY=[32_BYTE_HEX]
+JWT_SECRET=[32_BYTE_HEX]
 
-# URLs
-WEB_URL=https://brail.app
-PUBLIC_HOST=brail.app
-DEV_PUBLIC_BASE=https://api.brail.app
+# Email
+RESEND_API_KEY=re_xxxxxxxxxxxxx
+FROM_EMAIL=noreply@yourdomain.com
 
-# SSL
-ACME_AUTO_SSL=true
-ACME_DIRECTORY_URL=https://acme-v02.api.letsencrypt.org/directory
+# URLs (update after deployment)
+WEB_URL=https://your-web-service.railway.app
+PUBLIC_HOST=your-api-service.railway.app
+DEV_PUBLIC_BASE=https://your-api-service.railway.app
 
-# Adapters
-BR_ENABLE_THIRD_PARTY_ADAPTERS=true
-ADAPTER_CATALOG_URL=https://catalog.brail.app
-
-# Production
+# Environment
 NODE_ENV=production
 PORT=3000
 ```
 
-## 4. Generate Encryption Keys
-
+**Web Service:**
 ```bash
-# Generate 32-byte encryption key
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# API URL (update after API deployment)
+NUXT_PUBLIC_API_URL=https://your-api-service.railway.app/v1
 
-# Generate encryption key for ACME
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# Environment
+NODE_ENV=production
 ```
 
-## 5. Domain & SSL Setup
+### Deployment Steps
 
-1. Point your domain to Railway
-2. Configure SSL in Railway dashboard
-3. Update environment variables with your domain
+1. Connect your GitHub repo to Railway
+2. Create two services: **API** and **Web**
+3. For both services, go to **Settings → Builder** and select **"Dockerfile"**
+4. Add environment variables to each service
+5. Deploy!
 
-## 6. Post-Deployment
+## Troubleshooting
 
-1. Run database migrations
-2. Test all functionality
-3. Set up monitoring (Sentry)
-4. Configure backups
+### API can't connect to database
+- ✅ Make sure you're using the **Connection Pooler URL** (port 6543, has `pgbouncer=true`)
+- ✅ Check that Railway has the correct `DATABASE_URL` environment variable
+
+### Web service build fails
+- ✅ Ensure `NUXT_PUBLIC_API_URL` is set
+- ✅ Check Railway is using the Dockerfile builder
+
+### Storage errors
+- ✅ Verify S3 credentials and bucket name
+- ✅ Check bucket CORS settings in DigitalOcean
+
+## Current Status
+
+✅ **Dockerfile**: Optimized for Railway (Debian-slim for Prisma compatibility)  
+✅ **pnpm Workspace**: Properly configured for monorepo builds  
+✅ **Environment Variables**: All required vars documented  
+⚠️ **Database Connection**: Needs Connection Pooler URL in Railway  
 
 ## Next Steps
 
-- [ ] Set up Supabase project
-- [ ] Configure DigitalOcean Spaces
-- [ ] Deploy to Railway
-- [ ] Set up custom domain
-- [ ] Add monitoring and alerting
-- [ ] Implement billing system
+- [ ] Update Railway `DATABASE_URL` to use Supabase Connection Pooler
+- [ ] Set up custom domain in Railway
+- [ ] Configure SSL/TLS
+- [ ] Add monitoring (optional)
+

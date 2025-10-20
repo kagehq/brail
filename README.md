@@ -24,6 +24,7 @@ Join our Discord community for discussions, support, and updates:
 
 ## Quick Start
 
+### Local Development
 ```bash
 # Install dependencies
 pnpm install
@@ -43,6 +44,15 @@ pnpm dev
 ```
 
 Open <http://localhost:3001> to use the web interface.
+
+### Production Deployment
+See [PRODUCTION_SETUP.md](./PRODUCTION_SETUP.md) for deploying to Railway with Supabase and DigitalOcean Spaces.
+
+**Status:** ✅ Ready for production deployment
+- Database: Supabase (PostgreSQL)
+- Storage: DigitalOcean Spaces (S3-compatible)
+- Hosting: Railway (Dockerized)
+- Email: Resend (magic link authentication)
 
 ## Deploy Your Site
 
