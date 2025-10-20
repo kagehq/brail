@@ -1,8 +1,9 @@
 # Use Node.js 22 Alpine
 FROM node:22-alpine AS base
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+# Install pnpm and Python for native builds
+RUN apk add --no-cache python3 make g++ && \
+    corepack enable && corepack prepare pnpm@8.15.0 --activate
 
 # Set working directory
 WORKDIR /app
