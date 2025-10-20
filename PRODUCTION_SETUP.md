@@ -10,12 +10,27 @@
 
 1. Create a project at [supabase.com](https://supabase.com)
 2. Go to **Project Settings → Database → Connection Pooling**
-3. Copy the **Transaction mode** connection string (required for Railway)
+3. Copy the **Transaction mode** connection string
+
+**⚠️ CRITICAL: Connection String Format**
+
+Prisma requires a specific format for the Supabase connection pooler. Use this exact format:
 
 ```bash
-# ⚠️ Use the Connection Pooler URL (not direct connection)
-DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true
+# Option 1: Connection Pooler (Recommended for Railway - handles many connections)
+DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+
+# Option 2: Direct Connection (Alternative - for fewer concurrent connections)
+DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
+
+# If Option 1 still fails, try removing the pgbouncer parameter:
+DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres
 ```
+
+**Notes:**
+- Railway works best with the pooler URL (port 6543)
+- If you see "invalid database string" error, try removing `?pgbouncer=true`
+- The `connection_limit=1` parameter helps with serverless environments
 
 4. Apply the database schema:
    - Go to **SQL Editor** in Supabase
@@ -51,8 +66,15 @@ FROM_EMAIL=noreply@yourdomain.com
 
 **API Service:**
 ```bash
-# Database (Connection Pooler!)
-DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true
+# Database - Try these in order if one doesn't work:
+# 1. Pooler with connection_limit (RECOMMENDED)
+DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+
+# 2. Pooler without pgbouncer parameter (if #1 fails with "invalid database string")
+# DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres
+
+# 3. Direct connection (if pooler doesn't work)
+# DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
 
 # Storage
 S3_ENDPOINT=https://[region].digitaloceanspaces.com
@@ -100,13 +122,32 @@ NODE_ENV=production
 
 ## Troubleshooting
 
-### API can't connect to database
-- ✅ Make sure you're using the **Connection Pooler URL** (port 6543, has `pgbouncer=true`)
-- ✅ Check that Railway has the correct `DATABASE_URL` environment variable
+### ❌ "The provided database string is invalid"
+This error means Prisma doesn't like a parameter in your `DATABASE_URL`:
+
+1. **Try removing `?pgbouncer=true`** from your connection string:
+   ```
+   DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres
+   ```
+2. If that doesn't work, try the **direct connection** (port 5432):
+   ```
+   DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
+   ```
+3. Update the environment variable in Railway and **redeploy**
+
+### ❌ "Can't reach database server"
+- ✅ Check that Supabase allows connections from Railway's IP (should be enabled by default)
+- ✅ Verify your password is correct (no special characters causing issues)
+- ✅ Try switching between pooler (port 6543) and direct (port 5432) connections
+
+### ❌ "Unable to require libquery_engine"
+- ✅ Make sure Railway is using the **Dockerfile** builder (not Nixpacks)
+- ✅ The Dockerfile uses `node:22-slim` which has proper OpenSSL support
 
 ### Web service build fails
 - ✅ Ensure `NUXT_PUBLIC_API_URL` is set
 - ✅ Check Railway is using the Dockerfile builder
+- ✅ Clear build cache if needed: **Settings → Clear Build Cache**
 
 ### Storage errors
 - ✅ Verify S3 credentials and bucket name
