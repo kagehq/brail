@@ -64,7 +64,7 @@ async function triggerEasterEgg() {
   }
   
   // Show toast
-  toast.success('🎮 Konami Code!', 'You found the secret! Keep building awesome stuff! 🚀');
+  toast.success('Konami Code!', 'You found the secret! Keep building awesome stuff!');
   
   // Bonus: Add some fun visual effect
   document.body.style.animation = 'rainbow 2s ease-in-out';
