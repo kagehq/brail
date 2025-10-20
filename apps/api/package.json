@@ -1,6 +1,6 @@
 {
   "name": "@br/api",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "scripts": {
     "build": "pnpm --filter @br/shared build && pnpm --filter @br/adapters build && pnpm --filter @br/domain-utils build && pnpm --filter @br/frameworks build && pnpm prisma generate && nest build",
     "dev": "nest start --watch",

@@ -1,12 +1,17 @@
 # Brail Production Dockerfile
-# Build version: 2025-10-20-v6
-FROM node:22-alpine
+# Build version: 2025-10-20-v7
+FROM node:22-slim
 
 # Install build dependencies for native modules and Prisma requirements
-# Note: Prisma requires libssl.so.1.1, but Alpine 3.19+ only has OpenSSL 3.x
-# We need to add the Alpine 3.16 repository to get openssl1.1-compat
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.16/main" >> /etc/apk/repositories && \
-    apk add --no-cache python3 make g++ openssl openssl1.1-compat
+# Debian-slim has better compatibility with Prisma's precompiled binaries
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    openssl \
+    ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 # Enable pnpm
 RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
