@@ -9,13 +9,17 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
+import { EmailService } from './email.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly emailService: EmailService,
+  ) {}
 
   /**
-   * Request a magic link (dev stub - just logs to console)
+   * Request a magic link
    */
   @Post('magic')
   async requestMagicLink(@Body() body: { email: string }) {
@@ -25,16 +29,11 @@ export class AuthController {
     const token = await this.authService.generateMagicToken(email);
     const magicLink = `${process.env.DEV_PUBLIC_BASE || 'http://localhost:3000'}/v1/auth/callback?token=${token}`;
 
-    // In dev mode, just log the link
-    console.log('\n==================================================');
-    console.log('🔐 MAGIC LINK (DEV MODE)');
-    console.log('==================================================');
-    console.log(`Email: ${email}`);
-    console.log(`Link:  ${magicLink}`);
-    console.log('==================================================\n');
+    // Send magic link via email
+    await this.emailService.sendMagicLink(email, magicLink);
 
     return {
-      message: 'Magic link sent! Check your console.',
+      message: 'Magic link sent! Check your email.',
     };
   }
 
