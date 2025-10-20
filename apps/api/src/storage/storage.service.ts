@@ -17,18 +17,19 @@ export class StorageService {
   private readonly bucket: string;
 
   constructor() {
-    const endpoint = process.env.S3_ENDPOINT;
-    const region = process.env.S3_REGION || 'us-east-1';
-    this.bucket = process.env.S3_BUCKET || 'br-deploys';
+    // Support both S3_ and MINIO_ environment variable prefixes
+    const endpoint = process.env.S3_ENDPOINT || process.env.MINIO_ENDPOINT;
+    const region = process.env.S3_REGION || process.env.MINIO_REGION || 'us-east-1';
+    this.bucket = process.env.S3_BUCKET || process.env.MINIO_BUCKET || 'br-deploys';
 
     this.client = new S3Client({
       endpoint,
       region,
       credentials: {
-        accessKeyId: process.env.S3_ACCESS_KEY || '',
-        secretAccessKey: process.env.S3_SECRET_KEY || '',
+        accessKeyId: process.env.S3_ACCESS_KEY || process.env.MINIO_ACCESS_KEY || '',
+        secretAccessKey: process.env.S3_SECRET_KEY || process.env.MINIO_SECRET_KEY || '',
       },
-      forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+      forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true' || process.env.MINIO_FORCE_PATH_STYLE === 'true',
     });
 
     this.logger.log(

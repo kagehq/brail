@@ -26,7 +26,8 @@ export class UploadsController {
     @Inject(forwardRef(() => LogsService))
     private readonly logsService: LogsService,
   ) {
-    const bucket = process.env.S3_BUCKET || 'br-deploys';
+    // Support both S3_ and MINIO_ environment variable prefixes
+    const bucket = process.env.S3_BUCKET || process.env.MINIO_BUCKET || 'br-deploys';
 
     // Create tus server with S3 store
     this.tusServer = new Server({
@@ -36,13 +37,13 @@ export class UploadsController {
         minPartSize: 5 * 1024 * 1024, // 5MB minimum
         s3ClientConfig: {
           bucket,
-          region: process.env.S3_REGION || 'us-east-1',
+          region: process.env.S3_REGION || process.env.MINIO_REGION || 'us-east-1',
           credentials: {
-            accessKeyId: process.env.S3_ACCESS_KEY || '',
-            secretAccessKey: process.env.S3_SECRET_KEY || '',
+            accessKeyId: process.env.S3_ACCESS_KEY || process.env.MINIO_ACCESS_KEY || '',
+            secretAccessKey: process.env.S3_SECRET_KEY || process.env.MINIO_SECRET_KEY || '',
           },
-          endpoint: process.env.S3_ENDPOINT,
-          forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+          endpoint: process.env.S3_ENDPOINT || process.env.MINIO_ENDPOINT,
+          forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true' || process.env.MINIO_FORCE_PATH_STYLE === 'true',
         },
       }),
       namingFunction: (req) => {
