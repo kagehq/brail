@@ -17,20 +17,17 @@
 Prisma requires a specific format for the Supabase connection pooler. Use this exact format:
 
 ```bash
-# Option 1: Connection Pooler (Recommended for Railway - handles many connections)
-DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
-
-# Option 2: Direct Connection (Alternative - for fewer concurrent connections)
-DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
-
-# If Option 1 still fails, try removing the pgbouncer parameter:
+# Option 1: Connection Pooler WITHOUT pgbouncer parameter (RECOMMENDED for Railway)
 DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres
+
+# Option 2: Direct Connection (Alternative if pooler doesn't work)
+DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
 ```
 
 **Notes:**
-- Railway works best with the pooler URL (port 6543)
-- If you see "invalid database string" error, try removing `?pgbouncer=true`
-- The `connection_limit=1` parameter helps with serverless environments
+- Railway + Prisma has issues with the `?pgbouncer=true` parameter - **DO NOT USE IT**
+- The pooler URL (port 6543) is recommended for handling multiple connections
+- If you see "invalid database string" error, you likely have unsupported parameters
 
 4. Apply the database schema:
    - Go to **SQL Editor** in Supabase
@@ -66,15 +63,8 @@ FROM_EMAIL=noreply@yourdomain.com
 
 **API Service:**
 ```bash
-# Database - Try these in order if one doesn't work:
-# 1. Pooler with connection_limit (RECOMMENDED)
-DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
-
-# 2. Pooler without pgbouncer parameter (if #1 fails with "invalid database string")
-# DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres
-
-# 3. Direct connection (if pooler doesn't work)
-# DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
+# Database - DO NOT include ?pgbouncer=true parameter!
+DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres
 
 # Storage
 S3_ENDPOINT=https://[region].digitaloceanspaces.com
@@ -125,7 +115,7 @@ NODE_ENV=production
 ### ❌ "The provided database string is invalid"
 This error means Prisma doesn't like a parameter in your `DATABASE_URL`:
 
-1. **Try removing `?pgbouncer=true`** from your connection string:
+1. **Remove `?pgbouncer=true` and any other parameters** from your connection string:
    ```
    DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres
    ```
@@ -137,8 +127,9 @@ This error means Prisma doesn't like a parameter in your `DATABASE_URL`:
 
 ### ❌ "Can't reach database server"
 - ✅ Check that Supabase allows connections from Railway's IP (should be enabled by default)
-- ✅ Verify your password is correct (no special characters causing issues)
+- ✅ Verify your password is correct (no special characters causing URL encoding issues)
 - ✅ Try switching between pooler (port 6543) and direct (port 5432) connections
+- ✅ Ensure no trailing spaces in the DATABASE_URL environment variable
 
 ### ❌ "Unable to require libquery_engine"
 - ✅ Make sure Railway is using the **Dockerfile** builder (not Nixpacks)
@@ -158,11 +149,12 @@ This error means Prisma doesn't like a parameter in your `DATABASE_URL`:
 ✅ **Dockerfile**: Optimized for Railway (Debian-slim for Prisma compatibility)  
 ✅ **pnpm Workspace**: Properly configured for monorepo builds  
 ✅ **Environment Variables**: All required vars documented  
-⚠️ **Database Connection**: Needs Connection Pooler URL in Railway  
+✅ **Database Connection**: Clean connection string format (no pgbouncer parameter)
 
 ## Next Steps
 
-- [ ] Update Railway `DATABASE_URL` to use Supabase Connection Pooler
+- [ ] Update Railway `DATABASE_URL` to remove `?pgbouncer=true` parameter
+- [ ] Verify both API and Web services are using Dockerfile builder
 - [ ] Set up custom domain in Railway
 - [ ] Configure SSL/TLS
 - [ ] Add monitoring (optional)
