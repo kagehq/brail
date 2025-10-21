@@ -205,6 +205,9 @@ importers:
       '@br/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@oxc-parser/binding-linux-x64-gnu':
+        specifier: ^0.43.0
+        version: 0.43.0
       canvas-confetti:
         specifier: ^1.9.3
         version: 1.9.3
@@ -2482,6 +2485,12 @@ packages:
     requiresBuild: true
     dev: false
     optional: true
+
+  /@oxc-parser/binding-linux-x64-gnu@0.43.0:
+    resolution: {integrity: sha512-567QcC7Her2Je8jVXYB0n4sW46IiODrtAMm/PwCPad/6SKYLDzZPhXKTJo2AfPW71OxWzBwvqMHGagWvAhEfuA==}
+    cpu: [x64]
+    os: [linux]
+    dev: false
 
   /@oxc-parser/binding-linux-x64-gnu@0.94.0:
     resolution: {integrity: sha512-TbtpRdViF3aPCQBKuEo+TcucwW3KFa6bMHVakgaJu12RZrFpO4h1IWppBbuuBQ9X7SfvpgC1YgCDGve9q6fpEA==}
