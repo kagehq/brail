@@ -7,9 +7,10 @@ import { HealthModule } from '../health/health.module';
 import { StorageModule } from '../storage/storage.module';
 import { EnvModule } from '../env/env.module';
 import { BuildLogsModule } from '../build-logs/build-logs.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [AdaptersModule, ProfilesModule, HealthModule, StorageModule, EnvModule, BuildLogsModule],
+  imports: [AdaptersModule, ProfilesModule, HealthModule, StorageModule, EnvModule, BuildLogsModule, AuditModule],
   controllers: [ReleasesController],
   providers: [ReleasesService],
   exports: [ReleasesService],

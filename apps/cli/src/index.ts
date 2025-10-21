@@ -11,6 +11,9 @@ import {
   profilesAddCommand,
   profilesListCommand,
   profilesDefaultCommand,
+  profilesGetCommand,
+  profilesUpdateCommand,
+  profilesRemoveCommand,
 } from './commands/profiles.js';
 import { releasesCommand } from './commands/releases.js';
 import { logsCommand } from './commands/logs.js';
@@ -30,6 +33,10 @@ import {
   domainRemoveCommand,
 } from './commands/domain.js';
 import { envCommand } from './commands/env.js';
+import { templatesCommand } from './commands/templates.js';
+import { sitesCommand } from './commands/sites.js';
+import { tokensCommand } from './commands/tokens.js';
+import { sandboxCommand } from './commands/sandbox.js';
 
 const program = new Command();
 
@@ -141,6 +148,31 @@ profiles
   .option('-s, --site <siteId>', 'Site ID')
   .option('-n, --name <name>', 'Profile name')
   .action(profilesDefaultCommand);
+
+profiles
+  .command('get')
+  .description('Get profile details')
+  .option('-s, --site <siteId>', 'Site ID')
+  .option('-i, --id <profileId>', 'Profile ID')
+  .action(profilesGetCommand);
+
+profiles
+  .command('update')
+  .description('Update a profile')
+  .option('-s, --site <siteId>', 'Site ID')
+  .option('-i, --id <profileId>', 'Profile ID')
+  .option('-n, --name <name>', 'New name')
+  .option('--config <json>', 'Config JSON')
+  .action(profilesUpdateCommand);
+
+profiles
+  .command('rm')
+  .alias('delete')
+  .description('Delete a profile')
+  .option('-s, --site <siteId>', 'Site ID')
+  .option('-i, --id <profileId>', 'Profile ID')
+  .option('-y, --yes', 'Skip confirmation')
+  .action(profilesRemoveCommand);
 
 program
   .command('releases')
@@ -268,5 +300,17 @@ domain
 
 // Env commands
 program.addCommand(envCommand);
+
+// Templates commands
+program.addCommand(templatesCommand);
+
+// Sites commands
+program.addCommand(sitesCommand);
+
+// Tokens commands
+program.addCommand(tokensCommand);
+
+// Sandbox commands
+program.addCommand(sandboxCommand);
 
 program.parse();

@@ -317,7 +317,40 @@ br profiles add \
   --branch main
 ```
 
-## Dynamic & Server-side Adapters
+## Serverless & Edge Adapters
+
+### Cloudflare Workers Adapter
+
+Deploy serverless functions to Cloudflare Workers for edge computing.
+
+#### Prerequisites
+
+1. **Cloudflare account**: Sign up at [cloudflare.com](https://cloudflare.com)
+2. **API token**: Generate with Workers:Edit permission
+3. **Account ID**: Found in Cloudflare dashboard
+
+#### Configuration
+
+```bash
+# Add Cloudflare Workers profile
+br profiles add \
+  --site <siteId> \
+  --name cf-workers \
+  --adapter cloudflare-workers \
+  --accountId <cf-account-id> \
+  --apiToken @~/.secrets/cf.token \
+  --scriptName my-worker
+```
+
+**Config Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `accountId` | ✅ | Cloudflare account ID |
+| `apiToken` | ✅ | Cloudflare API token |
+| `scriptName` | ✅ | Worker script name |
+
+## Dynamic Sandbox Adapters
 
 ### Cloudflare Sandbox Adapter
 
@@ -393,17 +426,16 @@ br profiles add \
 
 ## Comparison Table
 
-| Feature | Vercel | Cloudflare Pages | Railway | Fly.io | Render | Cloudflare Sandbox | Vercel Sandbox |
-|---------|--------|------------------|---------|--------|--------|-------------------|----------------|
-| **Status** | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA |
-| **Preview URLs** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Production Promotion** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Rollback** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Config Mapping** | ✅ vercel.json | ✅ _headers/_redirects | ✅ railway.json | ✅ fly.toml | ✅ render.yaml | ✅ wrangler.toml | ✅ vercel.json |
-| **Custom Domains** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Edge Locations** | Global | Global | Regional | Multi-region | Regional | Global | Global |
-| **Dynamic Code** | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **Runtime Support** | Static | Static | Static | Static | Static/Services | Node/Python/Deno | Node22/Python313 |
+| Feature | Vercel | Cloudflare Pages | Cloudflare Workers | Railway | Fly.io | Render | CF Sandbox | Vercel Sandbox |
+|---------|--------|------------------|-------------------|---------|--------|--------|------------|----------------|
+| **Status** | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA | ✅ GA |
+| **Preview URLs** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Production Promotion** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Rollback** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Custom Domains** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Edge Locations** | Global | Global | Global | Regional | Multi-region | Regional | Global | Global |
+| **Dynamic Code** | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| **Runtime Support** | Static | Static | JavaScript | Static | Static | Static/Services | Node/Python/Deno | Node22/Python313 |
 
 ## Common Patterns
 
@@ -499,5 +531,5 @@ br drop ./dist --site abc --profile vercel-sandbox
 ---
 
 **Adapter Status**: 
-- ✅ **Production Ready**: SSH/Rsync, S3, FTP, Vercel, Cloudflare Pages, Netlify, Railway, Fly.io, Render, GitHub Pages, Cloudflare Sandbox, Vercel Sandbox
-- 🚀 **Total Adapters**: 12 built-in adapters for all deployment scenarios
+- ✅ **Production Ready**: SSH/Rsync, S3, FTP, Vercel, Cloudflare Pages, Netlify, Railway, Fly.io, Render, GitHub Pages, Cloudflare Workers, Cloudflare Sandbox, Vercel Sandbox
+- 🚀 **Total Adapters**: 13 built-in adapters for all deployment scenarios

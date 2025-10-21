@@ -11,8 +11,11 @@ import type {
 } from './types.js';
 
 /**
- * Cloudflare Sandbox adapter for deploying dynamic sites with server-side processing
- * Combines static file hosting with secure code execution in isolated environments
+ * Cloudflare Sandbox adapter for secure code execution in isolated containers
+ * Based on: https://developers.cloudflare.com/sandbox/
+ * 
+ * Cloudflare Sandbox is built on Containers and provides isolated environments
+ * for executing untrusted code, perfect for AI agents, data analysis, and CI/CD.
  */
 export class CloudflareSandboxAdapter implements DeployAdapter {
   name = 'cloudflare-sandbox';
@@ -32,13 +35,8 @@ export class CloudflareSandboxAdapter implements DeployAdapter {
       return { valid: false, reason: 'apiToken is required' };
     }
 
-    // Validate sandbox configuration
-    if (!c.runtime || typeof c.runtime !== 'string') {
-      return { valid: false, reason: 'runtime is required (node, python, etc.)' };
-    }
-
-    if (!c.buildCommand || typeof c.buildCommand !== 'string') {
-      return { valid: false, reason: 'buildCommand is required (e.g., "npm run build")' };
+    if (!c.sandboxBinding || typeof c.sandboxBinding !== 'string') {
+      return { valid: false, reason: 'sandboxBinding is required (Durable Object binding name)' };
     }
 
     return { valid: true };
@@ -51,54 +49,59 @@ export class CloudflareSandboxAdapter implements DeployAdapter {
     const config = input.config as any;
     const { deployId, filesDir, site } = input;
 
-    ctx.logger.info('[Cloudflare Sandbox] Starting dynamic deployment...');
+    ctx.logger.info('[Cloudflare Sandbox] Starting sandbox deployment...');
+    ctx.logger.info('[Cloudflare Sandbox] Note: Sandboxes run in isolated containers powered by Durable Objects');
 
-    // 1. Upload static files to R2 storage
-    const staticFiles = await this.uploadStaticFiles(ctx, config, filesDir);
-    ctx.logger.info(`[Cloudflare Sandbox] Uploaded ${staticFiles.length} static files`);
+    try {
+      // Step 1: Create a Worker that uses the Sandbox SDK
+      const workerScript = await this.createSandboxWorker(ctx, config, filesDir);
+      ctx.logger.info('[Cloudflare Sandbox] Created Worker with Sandbox SDK integration');
 
-    // 2. Create sandbox environment
-    const sandboxId = await this.createSandbox(ctx, config, deployId);
-    ctx.logger.info(`[Cloudflare Sandbox] Created sandbox: ${sandboxId}`);
+      // Step 2: Deploy the Worker to Cloudflare
+      const workerId = await this.deployWorker(ctx, config, workerScript, deployId);
+      ctx.logger.info(`[Cloudflare Sandbox] Worker deployed: ${workerId}`);
 
-    // 3. Upload source code to sandbox
-    await this.uploadSourceCode(ctx, config, sandboxId, filesDir);
-    ctx.logger.info('[Cloudflare Sandbox] Uploaded source code to sandbox');
+      // Step 3: Create a sandbox session
+      const sessionId = await this.createSandboxSession(ctx, config, deployId);
+      ctx.logger.info(`[Cloudflare Sandbox] Sandbox session created: ${sessionId}`);
 
-    // 4. Execute build process in sandbox
-    const buildResult = await this.executeBuild(ctx, config, sandboxId);
-    ctx.logger.info(`[Cloudflare Sandbox] Build completed: ${buildResult.success ? 'success' : 'failed'}`);
+      // Step 4: Upload files to sandbox
+      await this.uploadFilesToSandbox(ctx, config, sessionId, filesDir);
+      ctx.logger.info('[Cloudflare Sandbox] Files uploaded to sandbox');
 
-    if (!buildResult.success) {
-      throw new Error(`Build failed: ${buildResult.error}`);
+      // Step 5: Execute setup/build commands if specified
+      if (config.buildCommand) {
+        ctx.logger.info(`[Cloudflare Sandbox] Executing build command: ${config.buildCommand}`);
+        await this.executeCommand(ctx, config, sessionId, config.buildCommand);
+      }
+
+      // Step 6: Start the application if specified
+      if (config.startCommand) {
+        ctx.logger.info(`[Cloudflare Sandbox] Starting application: ${config.startCommand}`);
+        await this.executeCommand(ctx, config, sessionId, config.startCommand, true);
+      }
+
+      // Step 7: Get preview URL
+      const previewUrl = await this.getPreviewUrl(ctx, config, sessionId);
+      ctx.logger.info(`[Cloudflare Sandbox] Preview URL: ${previewUrl}`);
+
+      return {
+        destinationRef: previewUrl,
+        platformDeploymentId: sessionId,
+        previewUrl,
+      };
+    } catch (error: any) {
+      ctx.logger.error(`[Cloudflare Sandbox] Deployment failed: ${error.message}`);
+      throw error;
     }
-
-    // 5. Start application server in sandbox
-    const previewUrl = await this.startApplication(ctx, config, sandboxId);
-    ctx.logger.info(`[Cloudflare Sandbox] Application started: ${previewUrl}`);
-
-    return {
-      destinationRef: previewUrl,
-      platformDeploymentId: sandboxId,
-      previewUrl,
-    };
   }
 
   async activate(
     ctx: AdapterContext,
-    input: ActivateInput & { target?: string; platformDeploymentId?: string },
+    input: ActivateInput,
   ): Promise<void> {
-    const config = input.config as any;
-    const target = (input as any).target || 'preview';
-    const platformDeploymentId = (input as any).platformDeploymentId;
-
-    if (target === 'production' && platformDeploymentId) {
-      ctx.logger.info(`[Cloudflare Sandbox] Promoting sandbox ${platformDeploymentId} to production`);
-      await this.promoteToProduction(ctx, config, platformDeploymentId);
-      ctx.logger.info('[Cloudflare Sandbox] Sandbox promoted to production');
-    } else {
-      ctx.logger.info('[Cloudflare Sandbox] Preview deployment already active');
-    }
+    // Cloudflare Sandbox sessions are active immediately after creation
+    ctx.logger.info('[Cloudflare Sandbox] Sandbox is already active and running');
   }
 
   async rollback(
@@ -112,9 +115,14 @@ export class CloudflareSandboxAdapter implements DeployAdapter {
       throw new Error('platformDeploymentId is required for Cloudflare Sandbox rollback');
     }
 
-    ctx.logger.info(`[Cloudflare Sandbox] Rolling back to sandbox ${platformDeploymentId}`);
-    await this.promoteToProduction(ctx, config, platformDeploymentId);
-    ctx.logger.info('[Cloudflare Sandbox] Rollback complete');
+    ctx.logger.info(`[Cloudflare Sandbox] Rolling back to session ${platformDeploymentId}`);
+    
+    // Cloudflare Sandbox doesn't have traditional rollback
+    // You would need to stop the current session and recreate from previous state
+    ctx.logger.warn('[Cloudflare Sandbox] Rollback requires recreating sandbox from previous state');
+    
+    await this.terminateSandboxSession(ctx, config, platformDeploymentId);
+    ctx.logger.info('[Cloudflare Sandbox] Previous session terminated');
   }
 
   async listReleases(
@@ -124,7 +132,8 @@ export class CloudflareSandboxAdapter implements DeployAdapter {
     const c = config as any;
     
     try {
-      const url = `https://api.cloudflare.com/client/v4/accounts/${c.accountId}/sandbox`;
+      // List sandbox sessions via Workers API
+      const url = `https://api.cloudflare.com/client/v4/accounts/${c.accountId}/workers/durable_objects/namespaces/${c.sandboxBinding}/objects`;
       const headers = this.getHeaders(c);
 
       const response = await fetch(url, { headers });
@@ -134,12 +143,12 @@ export class CloudflareSandboxAdapter implements DeployAdapter {
       }
 
       const data: any = await response.json();
-      const sandboxes = data.result || [];
+      const sessions = data.result || [];
 
-      return sandboxes.map((s: any) => ({
+      return sessions.map((s: any) => ({
         id: s.id,
-        timestamp: s.created_at,
-        status: s.status === 'active' ? 'active' : 'staged',
+        timestamp: s.created_on || new Date().toISOString(),
+        status: 'active' as const,
       }));
     } catch (error) {
       ctx.logger.error(`[Cloudflare Sandbox] Failed to list releases: ${error}`);
@@ -147,188 +156,224 @@ export class CloudflareSandboxAdapter implements DeployAdapter {
     }
   }
 
-  private async uploadStaticFiles(
+  private async createSandboxWorker(
     ctx: AdapterContext,
     config: any,
     filesDir: string,
-  ): Promise<Array<{ path: string; url: string }>> {
-    ctx.logger.info('[Cloudflare Sandbox] Uploading static files to R2...');
+  ): Promise<string> {
+    // Create a Worker script that uses the Cloudflare Sandbox SDK
+    // Based on: https://developers.cloudflare.com/sandbox/
+    
+    const workerScript = `
+import { getSandbox } from '@cloudflare/sandbox';
 
-    const files = await this.collectFiles(filesDir);
-    const uploadedFiles: Array<{ path: string; url: string }> = [];
-
-    for (const file of files) {
-      const content = await readFile(file.fullPath);
-      const uploadUrl = await this.uploadToR2(ctx, config, file.relativePath, content);
-      uploadedFiles.push({ path: file.relativePath, url: uploadUrl });
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const sessionId = url.searchParams.get('session') || 'default';
+    
+    // Get sandbox instance for this session
+    const sandbox = getSandbox(env.${config.sandboxBinding}, sessionId);
+    
+    // Handle different endpoints
+    if (url.pathname === '/exec') {
+      const { command } = await request.json();
+      const result = await sandbox.exec(command);
+      return Response.json({
+        output: result.stdout,
+        error: result.stderr,
+        exitCode: result.exitCode,
+        success: result.success
+      });
     }
+    
+    if (url.pathname === '/upload') {
+      const { path, content } = await request.json();
+      await sandbox.writeFile(path, content);
+      return Response.json({ success: true });
+    }
+    
+    if (url.pathname === '/read') {
+      const { path } = await request.json();
+      const content = await sandbox.readFile(path);
+      return Response.json({ content });
+    }
+    
+    if (url.pathname === '/code') {
+      const { code, language } = await request.json();
+      const ctx = await sandbox.createCodeContext({ language });
+      const result = await sandbox.runCode(code, { context: ctx });
+      return Response.json({
+        result: result.results,
+        logs: result.logs
+      });
+    }
+    
+    // Default: return sandbox info
+    return Response.json({
+      sandbox: 'active',
+      sessionId,
+      message: 'Cloudflare Sandbox is running'
+    });
+  }
+};
+`;
 
-    return uploadedFiles;
+    return workerScript;
   }
 
-  private async createSandbox(
+  private async deployWorker(
     ctx: AdapterContext,
     config: any,
+    workerScript: string,
     deployId: string,
   ): Promise<string> {
-    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/sandbox`;
+    const workerName = config.workerName || `sandbox-${deployId}`;
+    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/workers/scripts/${workerName}`;
     const headers = this.getHeaders(config);
 
+    // Upload worker script with Sandbox binding
+    const formData = new FormData();
+    
+    // Add the worker script
+    formData.append('worker.js', new Blob([workerScript], { type: 'application/javascript+module' }));
+
+    // Add metadata with Durable Object binding
+    const metadata = {
+      main_module: 'worker.js',
+      bindings: [
+        {
+          type: 'durable_object_namespace',
+          name: config.sandboxBinding,
+          class_name: 'Sandbox',
+          script_name: workerName,
+        }
+      ],
+      compatibility_date: new Date().toISOString().split('T')[0],
+    };
+    
+    formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+
     const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: `brail-${deployId}`,
-        runtime: config.runtime,
-        timeout: config.timeout || 300, // 5 minutes default
-        memory: config.memory || 128, // 128MB default
-      }),
+      method: 'PUT',
+      headers,
+      body: formData,
     });
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Failed to create sandbox: ${response.status} ${error}`);
+      throw new Error(`Failed to deploy worker: ${response.status} ${error}`);
     }
 
     const data: any = await response.json();
-    return data.result.id;
+    return data.result?.id || deployId;
   }
 
-  private async uploadSourceCode(
+  private async createSandboxSession(
     ctx: AdapterContext,
     config: any,
-    sandboxId: string,
+    sessionId: string,
+  ): Promise<string> {
+    // Sandbox sessions are created automatically when first accessed
+    // via the Worker's getSandbox() call
+    ctx.logger.debug('[Cloudflare Sandbox] Session will be created on first access');
+    return sessionId;
+  }
+
+  private async uploadFilesToSandbox(
+    ctx: AdapterContext,
+    config: any,
+    sessionId: string,
     filesDir: string,
   ): Promise<void> {
     const files = await this.collectFiles(filesDir);
-    
-    for (const file of files) {
-      const content = await readFile(file.fullPath);
-      
-      const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/sandbox/${sandboxId}/files`;
-      const headers = this.getHeaders(config);
+    const workerUrl = `https://${config.workerName || 'sandbox'}.${config.accountId}.workers.dev`;
 
-      const response = await fetch(url, {
+    ctx.logger.info(`[Cloudflare Sandbox] Uploading ${files.length} files...`);
+
+    for (const file of files) {
+      const content = await readFile(file.fullPath, 'utf-8');
+      const path = `/workspace/${file.relativePath}`;
+
+      await fetch(`${workerUrl}/upload?session=${sessionId}`, {
         method: 'POST',
         headers: {
-          ...headers,
-          'Content-Type': 'application/octet-stream',
+          'Content-Type': 'application/json',
         },
-        body: content,
+        body: JSON.stringify({ path, content }),
       });
 
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to upload file ${file.relativePath}: ${response.status} ${error}`);
-      }
+      ctx.logger.debug(`[Cloudflare Sandbox] Uploaded: ${file.relativePath}`);
     }
   }
 
-  private async executeBuild(
+  private async executeCommand(
     ctx: AdapterContext,
     config: any,
-    sandboxId: string,
-  ): Promise<{ success: boolean; error?: string; output?: string }> {
-    ctx.logger.info(`[Cloudflare Sandbox] Executing build: ${config.buildCommand}`);
-
-    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/sandbox/${sandboxId}/execute`;
-    const headers = this.getHeaders(config);
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        command: config.buildCommand,
-        timeout: config.buildTimeout || 300,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      return { success: false, error: `Build execution failed: ${response.status} ${error}` };
-    }
-
-    const data: any = await response.json();
-    
-    if (data.result.exitCode !== 0) {
-      return { 
-        success: false, 
-        error: data.result.stderr || 'Build failed with non-zero exit code',
-        output: data.result.stdout 
-      };
-    }
-
-    return { success: true, output: data.result.stdout };
-  }
-
-  private async startApplication(
-    ctx: AdapterContext,
-    config: any,
-    sandboxId: string,
-  ): Promise<string> {
-    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/sandbox/${sandboxId}/start`;
-    const headers = this.getHeaders(config);
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        command: config.startCommand || 'npm start',
-        port: config.port || 3000,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to start application: ${response.status} ${error}`);
-    }
-
-    const data: any = await response.json();
-    return data.result.previewUrl;
-  }
-
-  private async uploadToR2(
-    ctx: AdapterContext,
-    config: any,
-    key: string,
-    content: Buffer,
-  ): Promise<string> {
-    // This would integrate with Cloudflare R2 API
-    // For now, return a placeholder URL
-    return `https://r2.dev/${config.bucket}/${key}`;
-  }
-
-  private async promoteToProduction(
-    ctx: AdapterContext,
-    config: any,
-    sandboxId: string,
+    sessionId: string,
+    command: string,
+    detached = false,
   ): Promise<void> {
-    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/sandbox/${sandboxId}/promote`;
-    const headers = this.getHeaders(config);
+    const workerUrl = `https://${config.workerName || 'sandbox'}.${config.accountId}.workers.dev`;
 
-    const response = await fetch(url, {
+    const response = await fetch(`${workerUrl}/exec?session=${sessionId}`, {
       method: 'POST',
       headers: {
-        ...headers,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        environment: 'production',
-      }),
+      body: JSON.stringify({ command }),
     });
 
     if (!response.ok) {
+      throw new Error(`Failed to execute command: ${response.status}`);
+    }
+
+    const result: any = await response.json();
+    
+    if (result.output) {
+      ctx.logger.info(`[Cloudflare Sandbox] Output: ${result.output}`);
+    }
+    
+    if (result.error) {
+      ctx.logger.warn(`[Cloudflare Sandbox] Error: ${result.error}`);
+    }
+
+    if (!detached && result.exitCode !== 0) {
+      throw new Error(`Command failed with exit code ${result.exitCode}`);
+    }
+  }
+
+  private async getPreviewUrl(
+    ctx: AdapterContext,
+    config: any,
+    sessionId: string,
+  ): Promise<string> {
+    // Cloudflare Sandbox automatically generates preview URLs for exposed services
+    // The preview URL format is based on the port exposed
+    const port = config.port || 8080;
+    
+    // Preview URLs are automatically generated by Cloudflare Sandbox
+    // Format: https://{random-id}.{session-id}.cloudflaresandbox.com
+    return `https://${config.workerName || 'sandbox'}.${config.accountId}.workers.dev?session=${sessionId}`;
+  }
+
+  private async terminateSandboxSession(
+    ctx: AdapterContext,
+    config: any,
+    sessionId: string,
+  ): Promise<void> {
+    // Terminate sandbox session via Durable Objects API
+    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/workers/durable_objects/namespaces/${config.sandboxBinding}/objects/${sessionId}`;
+    const headers = this.getHeaders(config);
+
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers,
+    });
+
+    if (!response.ok && response.status !== 404) {
       const error = await response.text();
-      throw new Error(`Failed to promote sandbox: ${response.status} ${error}`);
+      throw new Error(`Failed to terminate sandbox: ${response.status} ${error}`);
     }
   }
 

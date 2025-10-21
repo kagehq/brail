@@ -1,0 +1,40 @@
+{
+  "id": "coming-soon",
+  "name": "Coming Soon",
+  "description": "Minimal coming soon page with email signup to build hype before launch",
+  "category": "marketing",
+  "tags": ["launch", "pre-launch", "email", "minimal"],
+  "author": "Brail",
+  "version": "1.0.0",
+  "tech": ["html", "tailwind"],
+  "buildRequired": false,
+  "preview": "preview.png",
+  "variables": [
+    {
+      "key": "PROJECT_NAME",
+      "label": "Project Name",
+      "description": "Name of your upcoming project",
+      "default": "Something Amazing",
+      "required": true
+    },
+    {
+      "key": "TAGLINE",
+      "label": "Tagline",
+      "description": "Short tagline describing your project",
+      "default": "The future of something is coming",
+      "required": true
+    },
+    {
+      "key": "LAUNCH_DATE",
+      "label": "Launch Date",
+      "description": "Expected launch date (e.g., Spring 2025)",
+      "default": "Coming Soon",
+      "required": false
+    }
+  ],
+  "adapters": {
+    "recommended": ["vercel", "cloudflare-pages", "netlify", "github-pages"],
+    "supported": "all"
+  }
+}
+

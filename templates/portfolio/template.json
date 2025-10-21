@@ -1,0 +1,47 @@
+{
+  "id": "portfolio",
+  "name": "Portfolio",
+  "description": "Clean, minimal portfolio for designers, developers, and creatives",
+  "category": "personal",
+  "tags": ["portfolio", "personal", "creative", "designer"],
+  "author": "Brail",
+  "version": "1.0.0",
+  "tech": ["html", "css", "javascript"],
+  "buildRequired": false,
+  "preview": "preview.png",
+  "variables": [
+    {
+      "key": "YOUR_NAME",
+      "label": "Your Name",
+      "description": "Your full name",
+      "default": "John Doe",
+      "required": true
+    },
+    {
+      "key": "YOUR_TITLE",
+      "label": "Your Title",
+      "description": "Your professional title",
+      "default": "Full Stack Developer",
+      "required": true
+    },
+    {
+      "key": "YOUR_BIO",
+      "label": "Bio",
+      "description": "Short bio about yourself",
+      "default": "Passionate developer with 5+ years of experience building web applications.",
+      "required": true
+    },
+    {
+      "key": "YOUR_EMAIL",
+      "label": "Email",
+      "description": "Contact email",
+      "default": "hello@example.com",
+      "required": false
+    }
+  ],
+  "adapters": {
+    "recommended": ["vercel", "netlify", "github-pages"],
+    "supported": "all"
+  }
+}
+

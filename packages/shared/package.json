@@ -6,19 +6,19 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     },
     "./src/audit.js": {
+      "types": "./dist/audit.d.ts",
       "import": "./dist/audit.js",
-      "require": "./dist/audit.cjs",
-      "types": "./dist/audit.d.ts"
+      "require": "./dist/audit.cjs"
     },
     "./src/crypto.js": {
+      "types": "./dist/crypto.d.ts",
       "import": "./dist/crypto.js",
-      "require": "./dist/crypto.cjs",
-      "types": "./dist/crypto.d.ts"
+      "require": "./dist/crypto.cjs"
     }
   },
   "scripts": {

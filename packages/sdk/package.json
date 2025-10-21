@@ -1,0 +1,70 @@
+{
+  "name": "@brailhq/sdk",
+  "version": "0.1.0",
+  "description": "Official JavaScript SDK for deploying to Brail in just a few lines of code",
+  "keywords": [
+    "brail",
+    "deployment",
+    "hosting",
+    "static-sites",
+    "vercel",
+    "netlify",
+    "cloudflare",
+    "sdk"
+  ],
+  "author": "Treadie, Inc.",
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kagehq/brail.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/kagehq/brail/tree/main/packages/sdk",
+  "bugs": {
+    "url": "https://github.com/kagehq/brail/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean --minify",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "form-data": "^4.0.0"
+  },
+  "bundledDependencies": [
+    "@br/shared"
+  ],
+  "devDependencies": {
+    "@br/shared": "workspace:*",
+    "@types/node": "^20.10.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  }
+}
+

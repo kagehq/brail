@@ -136,6 +136,17 @@
                   </div>
                 </div>
                 
+                <!-- Cloudflare Workers config -->
+                <div v-if="profile.adapter === 'cloudflare-workers' && profile.config" class="flex items-start gap-2">
+                  <svg class="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm text-white truncate">{{ profile.config.workerName }}</p>
+                    <p class="text-xs text-gray-500 truncate font-mono">{{ profile.config.accountId }}</p>
+                  </div>
+                </div>
+                
                 <!-- Cloudflare Sandbox config -->
                 <div v-if="profile.adapter === 'cloudflare-sandbox' && profile.config" class="flex items-start gap-2">
                   <svg class="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -337,6 +348,9 @@
                 <option value="fly" class="bg-black text-white">Fly.io</option>
                 <option value="render" class="bg-black text-white">Render</option>
                 <option value="github-pages" class="bg-black text-white">GitHub Pages</option>
+              </optgroup>
+              <optgroup label="Serverless & Edge Functions" class="bg-black text-white">
+                <option value="cloudflare-workers" class="bg-black text-white">Cloudflare Workers</option>
               </optgroup>
               <optgroup label="Dynamic & Server-side" class="bg-black text-white">
                 <option value="cloudflare-sandbox" class="bg-black text-white">Cloudflare Sandbox</option>
@@ -1023,6 +1037,58 @@
             </div>
           </div>
           
+          <!-- Cloudflare Workers Config -->
+          <div v-if="newProfile.adapter === 'cloudflare-workers'" class="space-y-4 p-4 border border-gray-500/15 rounded-lg">
+            <h4 class="font-medium text-white">Cloudflare Workers Configuration</h4>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Account ID *</label>
+              <input
+                v-model="newProfile.config.accountId"
+                type="text"
+                required
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="abc123..."
+              />
+              <p class="text-xs text-gray-500 mt-1">Find in Cloudflare dashboard URL</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">API Token *</label>
+              <input
+                v-model="newProfile.config.apiToken"
+                type="password"
+                required
+                autocomplete="new-password"
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+              />
+              <p class="text-xs text-gray-500 mt-1">Create at dash.cloudflare.com with Workers:Edit permissions</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Worker Name *</label>
+              <input
+                v-model="newProfile.config.workerName"
+                type="text"
+                required
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="my-worker"
+              />
+              <p class="text-xs text-gray-500 mt-1">Unique name for your worker</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">KV Namespace ID (optional)</label>
+              <input
+                v-model="newProfile.config.kvNamespaceId"
+                type="text"
+                class="w-full px-3 py-2 text-white border outline-none border-gray-500/25 bg-gray-500/10 rounded-lg text-sm"
+                placeholder="abc123..."
+              />
+              <p class="text-xs text-gray-500 mt-1">For storing static assets in KV storage</p>
+            </div>
+          </div>
+          
           <!-- Railway Config -->
           <div v-if="newProfile.adapter === 'railway'" class="space-y-4 p-4 border border-gray-500/15 rounded-lg">
             <h4 class="font-medium text-white">Railway Configuration</h4>
@@ -1259,6 +1325,9 @@ const newProfile = ref({
     // Cloudflare Pages
     accountId: '',
     apiToken: '',
+    // Cloudflare Workers
+    workerName: '',
+    kvNamespaceId: '',
     // Railway
     projectId: '',
     environmentId: '',
@@ -1387,6 +1456,7 @@ const getAdapterLabel = (adapter: string) => {
     's3': 'Amazon S3',
     'vercel': 'Vercel',
     'cloudflare-pages': 'Cloudflare Pages',
+    'cloudflare-workers': 'Cloudflare Workers',
     'railway': 'Railway',
     'fly': 'Fly.io',
     'render': 'Render',
@@ -1501,6 +1571,16 @@ const handleCreate = async () => {
 
       if (newProfile.value.config.productionDomain) {
         adapterConfig.productionDomain = newProfile.value.config.productionDomain;
+      }
+    } else if (newProfile.value.adapter === 'cloudflare-workers') {
+      adapterConfig = {
+        accountId: newProfile.value.config.accountId,
+        apiToken: newProfile.value.config.apiToken,
+        workerName: newProfile.value.config.workerName,
+      };
+
+      if (newProfile.value.config.kvNamespaceId) {
+        adapterConfig.kvNamespaceId = newProfile.value.config.kvNamespaceId;
       }
     } else if (newProfile.value.adapter === 'render') {
       adapterConfig = {

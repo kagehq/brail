@@ -36,7 +36,7 @@
           </button>
         </div>
         
-        <div class="grid md:grid-cols-3 gap-4">
+        <div class="grid md:grid-cols-4 gap-4">
           <!-- Action Filter -->
           <div>
             <label class="flex items-center gap-1.5 text-sm font-semibold text-gray-300 mb-2">
@@ -104,6 +104,48 @@
               type="date"
               class="w-full bg-gray-500/10 hover:bg-gray-500/15 border border-gray-500/25 hover:border-gray-500/40 text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300/50 focus:border-blue-300/50 transition-all"
             />
+          </div>
+
+          <!-- Adapter Filter -->
+          <div>
+            <label class="flex items-center gap-1.5 text-sm font-semibold text-gray-300 mb-2">
+              <svg class="w-4 h-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              Adapter
+            </label>
+            <div class="relative">
+              <select
+                v-model="filterAdapter"
+                class="w-full bg-gray-500/10 hover:bg-gray-500/15 border border-gray-500/25 hover:border-gray-500/40 text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300/50 focus:border-blue-300/50 transition-all appearance-none cursor-pointer"
+              >
+                <option value="">All Adapters</option>
+                <optgroup label="Platform Adapters">
+                  <option value="vercel">Vercel</option>
+                  <option value="cloudflare-pages">Cloudflare Pages</option>
+                  <option value="cloudflare-workers">Cloudflare Workers</option>
+                  <option value="netlify">Netlify</option>
+                  <option value="railway">Railway</option>
+                  <option value="fly">Fly.io</option>
+                  <option value="render">Render</option>
+                </optgroup>
+                <optgroup label="Static Hosting">
+                  <option value="s3">S3</option>
+                  <option value="github-pages">GitHub Pages</option>
+                  <option value="ftp">FTP</option>
+                  <option value="ssh-rsync">SSH/Rsync</option>
+                </optgroup>
+                <optgroup label="Sandboxes">
+                  <option value="vercel-sandbox">Vercel Sandbox</option>
+                  <option value="cloudflare-sandbox">Cloudflare Sandbox</option>
+                </optgroup>
+              </select>
+              <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -295,6 +337,7 @@ const loading = ref(true);
 const filterAction = ref('');
 const filterFrom = ref('');
 const filterTo = ref('');
+const filterAdapter = ref('');
 
 const expandedLogs = ref<Set<string>>(new Set());
 
@@ -354,6 +397,17 @@ const loadEvents = async () => {
       }
     }
 
+    // Apply adapter filter
+    if (filterAdapter.value) {
+      combined = combined.filter(e => {
+        // Check metadata for adapter field
+        if (e.metadata?.adapter === filterAdapter.value) return true;
+        // Check if it's a build log with that adapter
+        if (e.type === 'build' && e.adapter === filterAdapter.value) return true;
+        return false;
+      });
+    }
+
     events.value = combined;
   } catch (error) {
     console.error('Failed to load activity:', error);
@@ -363,7 +417,7 @@ const loadEvents = async () => {
 };
 
 // Watch filters and reload
-watch([filterAction, filterFrom, filterTo], () => {
+watch([filterAction, filterFrom, filterTo, filterAdapter], () => {
   loadEvents();
 });
 
@@ -371,6 +425,7 @@ const clearFilters = () => {
   filterAction.value = '';
   filterFrom.value = '';
   filterTo.value = '';
+  filterAdapter.value = '';
 };
 
 onMounted(async () => {
@@ -529,6 +584,26 @@ const formatMetaValue = (key: string, value: any): string => {
   // Format cacheHit
   if (key === 'cacheHit') {
     return value ? 'Cache Hit' : 'Cache Miss';
+  }
+  
+  // Format adapter
+  if (key === 'adapter') {
+    const adapterLabels: Record<string, string> = {
+      'vercel': 'Vercel',
+      'cloudflare-pages': 'Cloudflare Pages',
+      'cloudflare-workers': 'Cloudflare Workers',
+      'cloudflare-sandbox': 'Cloudflare Sandbox',
+      'vercel-sandbox': 'Vercel Sandbox',
+      'netlify': 'Netlify',
+      'railway': 'Railway',
+      'fly': 'Fly.io',
+      'render': 'Render',
+      's3': 'S3',
+      'github-pages': 'GitHub Pages',
+      'ftp': 'FTP',
+      'ssh-rsync': 'SSH/Rsync',
+    };
+    return adapterLabels[value] || value;
   }
   
   // Default: show key: value

@@ -221,7 +221,7 @@
                   </button>
                   
                   <button
-                    v-if="release.status === 'staged' && release.target === 'preview' && ['vercel', 'cloudflare-pages', 'railway', 'fly'].includes(release.adapter)"
+                    v-if="release.status === 'staged' && release.target === 'preview' && canPromote(release.adapter)"
                     @click="promoteRelease(release.deployId, release.adapter)"
                     class="px-4 py-2 font-semibold bg-purple-300 text-black rounded-lg hover:bg-purple-400 transition-all hover:shadow-lg hover:shadow-purple-300/20 text-sm flex items-center gap-1.5"
                   >
@@ -232,7 +232,7 @@
                   </button>
                   
                   <button
-                    v-if="release.status === 'active' && ['vercel', 'cloudflare-pages', 'railway', 'fly'].includes(release.adapter)"
+                    v-if="release.status === 'active' && canRollback(release.adapter)"
                     @click="rollbackRelease(release.deployId, release.adapter)"
                     class="px-4 py-2 bg-yellow-300/10 border border-yellow-300/20 text-yellow-300 rounded-lg hover:bg-yellow-300/20 hover:border-yellow-300/30 text-sm font-semibold transition-all flex items-center gap-1.5"
                   >
@@ -612,7 +612,12 @@ const loadDeploys = async () => {
   }
 };
 
+let isLoadingReleases = false;
 const loadReleases = async () => {
+  // Prevent overlapping requests
+  if (isLoadingReleases) return;
+  
+  isLoadingReleases = true;
   try {
     const response = await fetch(`${config.public.apiUrl}/v1/sites/${siteId}/releases`, {
       headers: {
@@ -628,7 +633,20 @@ const loadReleases = async () => {
     }
   } catch (error) {
     console.error('Failed to load releases:', error);
+  } finally {
+    isLoadingReleases = false;
   }
+};
+
+// Debounce for release reloading
+let releaseReloadTimeout: NodeJS.Timeout | null = null;
+const debouncedLoadReleases = () => {
+  if (releaseReloadTimeout) {
+    clearTimeout(releaseReloadTimeout);
+  }
+  releaseReloadTimeout = setTimeout(() => {
+    loadReleases();
+  }, 1000); // Wait 1 second after last notification
 };
 
 onMounted(async () => {
@@ -660,7 +678,7 @@ onMounted(async () => {
             (notification.message?.includes('deploy') || 
              notification.message?.includes('release') ||
              notification.message?.includes('platform'))) {
-          loadReleases();
+          debouncedLoadReleases();
         }
       });
     }
@@ -672,6 +690,11 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  // Clear any pending reload timeouts
+  if (releaseReloadTimeout) {
+    clearTimeout(releaseReloadTimeout);
+  }
+  
   // Disconnect from notifications
   const notifications = useNotifications();
   notifications.unsubscribeSite(siteId);
@@ -985,6 +1008,33 @@ const copyBadgeCode = async () => {
     console.error('Failed to copy badge code:', error);
     toast.error('Copy Failed', 'Please copy manually: ' + badgeMarkdown.value);
   }
+};
+
+// Adapters that support promote/rollback
+const PLATFORM_ADAPTERS = [
+  'vercel',
+  'cloudflare-pages',
+  'cloudflare-workers',
+  'netlify',
+  'railway',
+  'fly',
+  'render',
+];
+
+// Adapters that only do static deployments (no promote/rollback)
+const STATIC_ONLY_ADAPTERS = [
+  's3',
+  'ftp',
+  'ssh-rsync',
+  'github-pages',
+];
+
+const canPromote = (adapter: string) => {
+  return PLATFORM_ADAPTERS.includes(adapter);
+};
+
+const canRollback = (adapter: string) => {
+  return PLATFORM_ADAPTERS.includes(adapter);
 };
 
 const formatDate = (date: Date | string) => {

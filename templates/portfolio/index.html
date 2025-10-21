@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{YOUR_NAME}} - {{YOUR_TITLE}}</title>
+  <meta name="description" content="{{YOUR_BIO}}">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #1a1a1a;
+      --accent-color: #0066cc;
+      --border-color: #e0e0e0;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-color: #1a1a1a;
+        --text-color: #ffffff;
+        --accent-color: #4d9aff;
+        --border-color: #333333;
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      color: var(--text-color);
+      background: var(--bg-color);
+      transition: background-color 0.3s ease;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    header {
+      padding: 4rem 0;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      font-size: 1.5rem;
+      color: var(--accent-color);
+      margin-bottom: 1rem;
+    }
+
+    .bio {
+      font-size: 1.125rem;
+      max-width: 600px;
+      margin: 0 auto;
+      opacity: 0.8;
+    }
+
+    nav {
+      margin: 3rem 0;
+      text-align: center;
+    }
+
+    nav a {
+      display: inline-block;
+      margin: 0 1rem;
+      color: var(--text-color);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    nav a:hover {
+      color: var(--accent-color);
+    }
+
+    section {
+      margin: 4rem 0;
+    }
+
+    h2 {
+      font-size: 2rem;
+      margin-bottom: 2rem;
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 0.5rem;
+    }
+
+    .project {
+      margin-bottom: 2rem;
+      padding: 1.5rem;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .project:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .project h3 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+      color: var(--accent-color);
+    }
+
+    .project p {
+      margin-bottom: 1rem;
+      opacity: 0.8;
+    }
+
+    .project-tags {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .tag {
+      padding: 0.25rem 0.75rem;
+      background: var(--accent-color);
+      color: white;
+      border-radius: 20px;
+      font-size: 0.875rem;
+    }
+
+    .skills {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+
+    .skill {
+      padding: 1rem;
+      text-align: center;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      transition: border-color 0.2s ease;
+    }
+
+    .skill:hover {
+      border-color: var(--accent-color);
+    }
+
+    .contact {
+      text-align: center;
+      padding: 3rem 0;
+    }
+
+    .contact-email {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 1rem 2rem;
+      background: var(--accent-color);
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: opacity 0.2s ease;
+    }
+
+    .contact-email:hover {
+      opacity: 0.9;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem 0;
+      opacity: 0.6;
+      font-size: 0.875rem;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 2rem;
+      }
+
+      .subtitle {
+        font-size: 1.25rem;
+      }
+
+      nav a {
+        display: block;
+        margin: 0.5rem 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>{{YOUR_NAME}}</h1>
+      <div class="subtitle">{{YOUR_TITLE}}</div>
+      <p class="bio">{{YOUR_BIO}}</p>
+    </header>
+
+    <nav>
+      <a href="#projects">Projects</a>
+      <a href="#skills">Skills</a>
+      <a href="#contact">Contact</a>
+    </nav>
+
+    <section id="projects">
+      <h2>Featured Projects</h2>
+      
+      <div class="project">
+        <h3>Project One</h3>
+        <p>A modern web application built with cutting-edge technologies. Features include real-time updates, responsive design, and seamless user experience.</p>
+        <div class="project-tags">
+          <span class="tag">React</span>
+          <span class="tag">Node.js</span>
+          <span class="tag">MongoDB</span>
+        </div>
+      </div>
+
+      <div class="project">
+        <h3>Project Two</h3>
+        <p>Mobile-first e-commerce platform with integrated payment processing. Increased client revenue by 40% within first quarter.</p>
+        <div class="project-tags">
+          <span class="tag">Next.js</span>
+          <span class="tag">Stripe</span>
+          <span class="tag">Tailwind</span>
+        </div>
+      </div>
+
+      <div class="project">
+        <h3>Project Three</h3>
+        <p>API development and microservices architecture for a SaaS product serving 10,000+ users daily.</p>
+        <div class="project-tags">
+          <span class="tag">Python</span>
+          <span class="tag">FastAPI</span>
+          <span class="tag">Docker</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="skills">
+      <h2>Skills & Technologies</h2>
+      <div class="skills">
+        <div class="skill">JavaScript</div>
+        <div class="skill">TypeScript</div>
+        <div class="skill">React</div>
+        <div class="skill">Node.js</div>
+        <div class="skill">Python</div>
+        <div class="skill">SQL</div>
+        <div class="skill">Docker</div>
+        <div class="skill">AWS</div>
+      </div>
+    </section>
+
+    <section id="contact" class="contact">
+      <h2>Get In Touch</h2>
+      <p>Interested in working together? Let's connect!</p>
+      <a href="mailto:{{YOUR_EMAIL}}" class="contact-email">Send me an email</a>
+    </section>
+
+    <footer>
+      <p>&copy; 2025 {{YOUR_NAME}}. Powered by <a href="https://github.com/kagehq/brail" style="color: var(--accent-color);">Brail</a></p>
+    </footer>
+  </div>
+</body>
+</html>
+

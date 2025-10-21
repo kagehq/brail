@@ -3,12 +3,13 @@ import { SshRsyncAdapter } from './sshRsync.adapter.js';
 import { S3Adapter } from './s3.adapter.js';
 import { VercelAdapter } from './vercel.adapter.js';
 import { CloudflarePagesAdapter } from './cloudflare-pages.adapter.js';
+import { CloudflareWorkersAdapter } from './cloudflare-workers.adapter.js';
+import { CloudflareSandboxAdapter } from './cloudflare-sandbox.adapter.js';
 import { RailwayAdapter } from './railway.adapter.js';
 import { FlyAdapter } from './fly.adapter.js';
 import { FtpAdapter } from './ftp.adapter.js';
 import { GitHubPagesAdapter } from './github-pages.adapter.js';
 import { NetlifyAdapter } from './netlify.adapter.js';
-import { CloudflareSandboxAdapter } from './cloudflare-sandbox.adapter.js';
 import { vercelSandboxAdapter } from './vercel-sandbox.adapter.js';
 import { RenderAdapter } from './render.adapter.js';
 
@@ -17,12 +18,13 @@ export { SshRsyncAdapter } from './sshRsync.adapter.js';
 export { S3Adapter } from './s3.adapter.js';
 export { VercelAdapter } from './vercel.adapter.js';
 export { CloudflarePagesAdapter } from './cloudflare-pages.adapter.js';
+export { CloudflareWorkersAdapter } from './cloudflare-workers.adapter.js';
+export { CloudflareSandboxAdapter } from './cloudflare-sandbox.adapter.js';
 export { RailwayAdapter } from './railway.adapter.js';
 export { FlyAdapter } from './fly.adapter.js';
 export { FtpAdapter } from './ftp.adapter.js';
 export { GitHubPagesAdapter } from './github-pages.adapter.js';
 export { NetlifyAdapter } from './netlify.adapter.js';
-export { CloudflareSandboxAdapter } from './cloudflare-sandbox.adapter.js';
 export { vercelSandboxAdapter } from './vercel-sandbox.adapter.js';
 export { RenderAdapter } from './render.adapter.js';
 
@@ -64,6 +66,9 @@ adapterRegistry.register(new FlyAdapter());
 adapterRegistry.register(new GitHubPagesAdapter());
 adapterRegistry.register(new RenderAdapter());
 
-// Phase 4 adapters - Dynamic/Server-side processing
-adapterRegistry.register(new CloudflareSandboxAdapter());
+// Phase 4 adapters - Serverless/Edge Functions
+adapterRegistry.register(new CloudflareWorkersAdapter());
 adapterRegistry.register(vercelSandboxAdapter);
+
+// Phase 5 adapters - Sandboxes/Code Execution
+adapterRegistry.register(new CloudflareSandboxAdapter());

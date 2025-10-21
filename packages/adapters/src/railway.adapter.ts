@@ -1,6 +1,9 @@
-import { readdir, stat, readFile } from 'fs/promises';
+import { readdir, stat, readFile, writeFile, mkdtemp, rm, mkdir } from 'fs/promises';
 import { join } from 'path';
+import { tmpdir } from 'os';
+import { spawn } from 'child_process';
 import FormData from 'form-data';
+import { createReadStream } from 'fs';
 import type {
   DeployAdapter,
   AdapterContext,
@@ -59,21 +62,27 @@ export class RailwayAdapter implements DeployAdapter {
       const serviceId = await this.ensureService(ctx, config);
       ctx.logger.info(`[Railway] Using service: ${serviceId}`);
 
-      // Step 2: Create deployment via Railway API
-      const deployment = await this.createDeployment(ctx, config, serviceId);
-      ctx.logger.info(`[Railway] Deployment created: ${deployment.id}`);
+      // Step 2: Package files with Dockerfile
+      const { archivePath, tempDir } = await this.packageForDeployment(ctx, filesDir, deployId);
+      ctx.logger.info('[Railway] Files packaged successfully');
 
-      // Step 3: Upload static files
-      await this.uploadFiles(ctx, config, deployment.id, filesDir);
-      ctx.logger.info('[Railway] Files uploaded successfully');
+      // Step 3: Upload source archive to Railway
+      const deploymentId = await this.uploadSourceArchive(ctx, config, serviceId, archivePath);
+      ctx.logger.info(`[Railway] Deployment created: ${deploymentId}`);
 
-      // Step 4: Trigger build/deploy
-      const deploymentUrl = await this.triggerDeploy(ctx, config, deployment.id);
+      // Step 4: Wait for deployment to complete
+      await this.waitForDeployment(ctx, config, deploymentId);
+      
+      // Step 5: Get deployment URL
+      const deploymentUrl = await this.getDeploymentUrl(ctx, config, serviceId, deploymentId);
       ctx.logger.info(`[Railway] Deployment URL: ${deploymentUrl}`);
 
+      // Cleanup temp directory
+      await rm(tempDir, { recursive: true, force: true });
+
       return {
-        destinationRef: `railway://${serviceId}/${deployment.id}`,
-        platformDeploymentId: deployment.id,
+        destinationRef: `railway://${serviceId}/${deploymentId}`,
+        platformDeploymentId: deploymentId,
         previewUrl: deploymentUrl,
       };
     } catch (error: any) {
@@ -218,65 +227,225 @@ export class RailwayAdapter implements DeployAdapter {
     return createData.serviceCreate.id;
   }
 
-  private async createDeployment(ctx: AdapterContext, config: any, serviceId: string): Promise<any> {
+  private async packageForDeployment(
+    ctx: AdapterContext,
+    filesDir: string,
+    deployId: string,
+  ): Promise<{ archivePath: string; tempDir: string }> {
+    ctx.logger.info('[Railway] Packaging files for deployment...');
+
+    // Create temp directory
+    const tempDir = await mkdtemp(join(tmpdir(), 'railway-'));
+    
+    // Create Dockerfile for static site hosting
+    const dockerfile = `FROM nginx:alpine
+
+# Copy static files
+COPY . /usr/share/nginx/html
+
+# Create nginx config for SPA routing
+RUN echo 'server { \\
+    listen 80; \\
+    listen [::]:80; \\
+    root /usr/share/nginx/html; \\
+    index index.html index.htm; \\
+    \\
+    location / { \\
+        try_files \\$uri \\$uri/ /index.html =404; \\
+    } \\
+    \\
+    # Gzip compression \\
+    gzip on; \\
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript; \\
+    \\
+    # Cache static assets \\
+    location ~* \\.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ { \\
+        expires 1y; \\
+        add_header Cache-Control "public, immutable"; \\
+    } \\
+}' > /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+`;
+
+    await writeFile(join(tempDir, 'Dockerfile'), dockerfile);
+
+    // Copy all files from filesDir to tempDir
+    await this.copyDirectory(filesDir, tempDir);
+
+    // Create tarball
+    const archivePath = join(tempDir, 'deploy.tar.gz');
+    await this.createTarball(tempDir, archivePath);
+
+    return { archivePath, tempDir };
+  }
+
+  private async uploadSourceArchive(
+    ctx: AdapterContext,
+    config: any,
+    serviceId: string,
+    archivePath: string,
+  ): Promise<string> {
     const { token } = config;
 
-    const mutation = `
-      mutation DeploymentCreate($input: DeploymentCreateInput!) {
-        deploymentCreate(input: $input) {
-          id
-          createdAt
-        }
-      }
-    `;
+    ctx.logger.info('[Railway] Uploading source archive...');
 
-    const data = await this.railwayGraphQL(ctx, token, mutation, {
-      input: {
-        serviceId,
-        environmentId: config.environmentId,
-      },
+    // Use Railway's deployment API with source upload
+    const formData = new FormData();
+    formData.append('source', createReadStream(archivePath), {
+      filename: 'deploy.tar.gz',
+      contentType: 'application/gzip',
     });
 
-    return data.deploymentCreate;
-  }
+    const response = await fetch(
+      `https://backboard.railway.app/project/${config.projectId}/environment/${config.environmentId}/service/${serviceId}/up`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...formData.getHeaders(),
+        },
+        body: formData,
+      },
+    );
 
-  private async uploadFiles(ctx: AdapterContext, config: any, deploymentId: string, filesDir: string): Promise<void> {
-    // Railway doesn't have a direct file upload API like Cloudflare Pages
-    // In a real implementation, you would:
-    // 1. Package files into a tar/zip
-    // 2. Upload to Railway's blob storage
-    // 3. Configure the deployment to use these files
-    
-    // For this implementation, we'll use Railway's volume mounting or
-    // assume files are part of the service's git repo/Docker image
-    
-    ctx.logger.info('[Railway] Note: Railway deployments typically use Git or Docker images.');
-    ctx.logger.info('[Railway] For static files, consider using Railway volumes or including files in the image.');
-    
-    // Placeholder for actual file upload logic
-    // This would require packaging files and using Railway's storage API
-  }
-
-  private async triggerDeploy(ctx: AdapterContext, config: any, deploymentId: string): Promise<string> {
-    const { token, projectId, environmentId } = config;
-
-    // Trigger the deployment
-    const mutation = `
-      mutation DeploymentTrigger($id: String!) {
-        deploymentTrigger(id: $id) {
-          id
-          url
-        }
-      }
-    `;
-
-    try {
-      const data = await this.railwayGraphQL(ctx, token, mutation, { id: deploymentId });
-      return data.deploymentTrigger?.url || `https://${projectId}.railway.app`;
-    } catch (error) {
-      // If trigger fails, return a default URL
-      return `https://${projectId}.up.railway.app`;
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Railway upload failed: ${response.status} ${errorText}`);
     }
+
+    const data: any = await response.json();
+    return data.deploymentId || data.id;
+  }
+
+  private async waitForDeployment(
+    ctx: AdapterContext,
+    config: any,
+    deploymentId: string,
+  ): Promise<void> {
+    ctx.logger.info('[Railway] Waiting for deployment to complete...');
+
+    const maxAttempts = 60; // 5 minutes max
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      try {
+        const query = `
+          query GetDeployment($id: String!) {
+            deployment(id: $id) {
+              id
+              status
+              url
+            }
+          }
+        `;
+
+        const data = await this.railwayGraphQL(ctx, config.token, query, { id: deploymentId });
+        const status = data.deployment?.status;
+
+        if (status === 'SUCCESS') {
+          ctx.logger.info('[Railway] Deployment successful');
+          return;
+        }
+
+        if (status === 'FAILED' || status === 'CRASHED') {
+          throw new Error(`Deployment failed with status: ${status}`);
+        }
+
+        ctx.logger.debug(`[Railway] Deployment status: ${status}`);
+      } catch (error: any) {
+        // Continue waiting if query fails
+        ctx.logger.debug(`[Railway] Status check attempt ${attempts + 1}/${maxAttempts}`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+      attempts++;
+    }
+
+    throw new Error('Deployment timed out after 5 minutes');
+  }
+
+  private async getDeploymentUrl(
+    ctx: AdapterContext,
+    config: any,
+    serviceId: string,
+    deploymentId: string,
+  ): Promise<string> {
+    try {
+      const query = `
+        query GetDeployment($id: String!) {
+          deployment(id: $id) {
+            id
+            url
+          }
+        }
+      `;
+
+      const data = await this.railwayGraphQL(ctx, config.token, query, { id: deploymentId });
+      
+      if (data.deployment?.url) {
+        return data.deployment.url;
+      }
+    } catch (error) {
+      ctx.logger.debug('[Railway] Could not fetch deployment URL from API');
+    }
+
+    // Fallback to constructing URL
+    return `https://${serviceId}.up.railway.app`;
+  }
+
+  private async copyDirectory(source: string, destination: string): Promise<void> {
+    const entries = await readdir(source, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = join(source, entry.name);
+      const destPath = join(destination, entry.name);
+
+      if (entry.isDirectory()) {
+        // Skip hidden directories and node_modules
+        if (entry.name.startsWith('.') || entry.name === 'node_modules') {
+          continue;
+        }
+        await mkdir(destPath, { recursive: true });
+        await this.copyDirectory(srcPath, destPath);
+      } else if (entry.isFile()) {
+        // Skip hidden files except .well-known
+        if (entry.name.startsWith('.') && entry.name !== '.well-known') {
+          continue;
+        }
+        const content = await readFile(srcPath);
+        await writeFile(destPath, content);
+      }
+    }
+  }
+
+  private async createTarball(sourceDir: string, outputPath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Exclude the output archive itself from the tarball
+      const tar = spawn('tar', [
+        '-czf',
+        outputPath,
+        '--exclude=deploy.tar.gz',
+        '-C',
+        sourceDir,
+        '.',
+      ]);
+
+      let stderr = '';
+      tar.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      tar.on('error', (error) => reject(error));
+      tar.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`tar exited with code ${code}: ${stderr}`));
+        }
+      });
+    });
   }
 
   private async redeployment(ctx: AdapterContext, config: any, deploymentId: string): Promise<void> {

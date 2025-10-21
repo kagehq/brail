@@ -30,5 +30,6 @@ coverage
 *.log
 .turbo
 .cache
+cookies.txt
 
 apps/web/.env

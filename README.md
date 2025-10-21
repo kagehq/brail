@@ -1,20 +1,21 @@
 # Brail
 
-> Deploy static sites and dynamic applications anywhere with zero downtime and instant rollbacks.
+> Modern deployment platform with zero downtime and instant rollbacks. Deploy anywhere, no vendor lock-in.
 
-**Brail** is a modern FileZilla that lets you push your site to your own servers, cloud storage, or platforms like Vercel and Cloudflare Pages. Full control, no vendor lock-in.
+**Brail** is like FileZilla for the modern web - push your sites to your own servers, cloud storage, or platforms like Vercel and Cloudflare. Full control, maximum flexibility.
 
 ## Features
 
-- Deploy to your own servers (SSH/FTP), S3, or platforms (Vercel/Netlify/Railway/Render)
-- **Dynamic sites** with Cloudflare Sandbox & Vercel Sandbox (AI-powered, interactive playgrounds)
-- Zero downtime deployments with instant rollbacks
-- Auto-detect and build Next.js, Astro, Vite, Nuxt, SvelteKit
-- Scoped environment variables with encryption
-- Custom domains with auto-SSL via Let's Encrypt
-- Replace single files without full redeploy
-- Drag & drop UI + powerful CLI
-- Remote adapter catalog discoverable from CLI and dashboard
+- **13 Deployment Adapters** - SSH, FTP, S3, Vercel, Cloudflare, Railway, Fly.io, Render, Netlify, GitHub Pages, and more
+- **Zero Downtime** - Atomic deployments with instant rollbacks
+- **Live Patching** - Update individual files without full redeployment
+- **Programmatic SDK** - Deploy in 3 lines of JavaScript/TypeScript
+- **Templates** - Pre-built sites ready to deploy (landing pages, portfolios)
+- **Visual Adapter Builder** - Create custom adapters in your browser
+- **Sandboxes** - Cloudflare & Vercel sandboxes for dynamic apps
+- **Auto-Build** - Detect and build Next.js, Astro, Vite, Nuxt, SvelteKit
+- **Custom Domains** - Auto-SSL via Let's Encrypt
+- **Three Interfaces** - Web dashboard, CLI, and SDK
 
 ## Community & Support
 
@@ -25,6 +26,7 @@ Join our Discord community for discussions, support, and updates:
 ## Quick Start
 
 ### Local Development
+
 ```bash
 # Install dependencies
 pnpm install
@@ -46,104 +48,180 @@ pnpm dev
 Open <http://localhost:3001> to use the web interface.
 
 ### Production Deployment
-See [PRODUCTION_SETUP.md](./PRODUCTION_SETUP.md) for deploying to Railway with Supabase and DigitalOcean Spaces.
 
-**Status:** ✅ Ready for production deployment
 - Database: Supabase (PostgreSQL)
 - Storage: DigitalOcean Spaces (S3-compatible)
 - Hosting: Railway (Dockerized)
 - Email: Resend (magic link authentication)
 
-## Deploy Your Site
+## Installation
 
-### Web Interface (Recommended)
-
-1. Go to <http://localhost:3001> and create a site
-2. Drag your build folder into the upload zone
-3. Click "Finalize & Deploy"
-4. Your site is live at the preview URL
-
-### CLI (Optional)
+Brail is available as npm packages:
 
 ```bash
-# Install CLI globally
-cd apps/cli && pnpm build && pnpm link --global
+# CLI - Deploy from command line
+npm install -g @brailhq/cli
 
-# Deploy your site
-br drop ./dist --site <siteId> --yes
+# SDK - Programmatic deployments
+npm install @brailhq/sdk
+
+# Adapter Kit - Build custom adapters
+npm install @brailhq/adapter-kit
+
+# Scaffolder - Create new adapters
+npx create-br-adapter my-adapter
 ```
 
-## Ignore Files with .dropignore
+## Deploy Your Site
 
-Create a `.dropignore` file to exclude files from deployment:
+### 1. Web Interface (Easiest)
+
+1. Open <http://localhost:3001>
+2. Create a site
+3. Drag & drop your build folder
+4. Deploy! ✨
+
+### 2. CLI
+
+```bash
+# Install
+npm install -g @brailhq/cli
+
+# Deploy
+brail drop ./dist --site my-site --yes
+```
+
+### 3. SDK (Programmatic)
+
+```typescript
+import { Brail } from '@brailhq/sdk';
+
+const brail = new Brail({ apiKey: 'your-api-key' });
+
+// Deploy a site
+await brail.deploy({
+  siteId: 'my-site',
+  path: './dist',
+  adapter: 'vercel',
+  config: { token: 'xxx' }
+});
+
+// Or spin up a sandbox
+const sandbox = await brail.createSandbox({
+  provider: 'vercel-sandbox',
+  path: './my-app',
+  config: {
+    token: 'vercel-token',
+    runtime: 'node22'
+  }
+});
+console.log('Sandbox URL:', sandbox.url);
+```
+
+→ See [`packages/sdk/README.md`](./packages/sdk/README.md) for full docs
+
+## Templates
+
+Deploy pre-built sites in seconds:
+
+```bash
+# CLI
+br templates use landing-page --name "My Site"
+
+# SDK
+await brail.deployTemplate({
+  template: 'landing-page',
+  siteName: 'my-site'
+});
+```
+
+**Available:** Landing Page, Portfolio, Coming Soon
+
+→ Web: <http://localhost:3001/templates> | Docs: [`templates/README.md`](./templates/README.md)
+
+## Configuration
+
+### Ignore Files
+
+Create `.dropignore` to exclude files:
 
 ```text
-# .dropignore example
 node_modules/
 .git/
 *.log
-.env
 ```
 
-## Environment Variables
+### Environment Variables
 
-Manage environment variables through the web interface:
+Add via web interface (**Environment** tab) or CLI:
 
-1. Go to your site's **Environment** tab
-2. Add variables for different scopes:
-   - **Build** - Available during build process
-   - **Runtime** - Available to your application
-   - **Adapter** - Platform-specific variables
+```bash
+br env add --site my-site --key API_KEY --value secret
+```
 
-**Available scopes:** `build`, `runtime:preview`, `runtime:production`, `adapter:<name>`
+## Available Adapters (13)
 
-## Available Adapters
+**Traditional & Self-Hosted:**
 
-**Static & Storage (7):**
+- SSH/Rsync (zero-downtime, health checks)
+- FTP/FTPS
 
-- **SSH/Rsync** - Deploy to your own servers via SSH
-- **FTP** - Upload to any FTP server
-- **S3** - AWS S3, MinIO, or S3-compatible storage
-- **Vercel** - Deploy to Vercel platform
-- **Cloudflare Pages** - Deploy to Cloudflare Pages
-- **Netlify** - Deploy to Netlify platform
-- **GitHub Pages** - Deploy to GitHub Pages
+**Storage & CDN:**
 
-**Dynamic & Server-side (2):**
+- S3 (AWS, MinIO, DigitalOcean Spaces)
 
-- **Cloudflare Sandbox** - Edge computing with global distribution
-- **Vercel Sandbox** - Enterprise-grade sandbox with superior observability
+**Managed Platforms:**
 
-**Platforms (3):**
+- Vercel
+- Cloudflare Pages
+- Netlify
+- Railway
+- Fly.io
+- Render
+- GitHub Pages
 
-- **Railway** - Deploy to Railway platform
-- **Fly.io** - Deploy to Fly.io platform
-- **Render** - Deploy to Render static sites or services
+**Serverless & Edge:**
 
-## Custom Adapters
+- Cloudflare Workers
+- Vercel Sandbox (Node.js, Python)
+- Cloudflare Sandbox (edge computing)
 
-Build your own adapter with [`@brailhq/adapter-kit`](https://www.npmjs.com/package/@brailhq/adapter-kit):
+## Build Your Own Adapter
+
+**Visual Builder (No Code):** <http://localhost:3001/adapter-builder>
+
+**CLI:**
 
 ```bash
 npm create br-adapter
 ```
 
-## Quick File Updates
+→ See [`docs/ADAPTER_SDK.md`](./docs/ADAPTER_SDK.md) for guide
 
-Replace or delete individual files without redeploying your entire site through the web interface:
+## Live Patching
 
-1. Go to your site's **Files** tab
-2. Upload new files or delete existing ones
-3. Changes are applied instantly without full redeploy
+Update files instantly without redeployment:
+
+```bash
+br replace ./app.css --site my-site --dest /css/app.css --yes
+br watch --site my-site --root ./dist --auto
+```
+
+Or use the **Files** tab in the web interface.
+
+## Documentation
+
+- **Quick Start:** You're reading it!
+- **Complete API & CLI Reference:** [DETAILED.md](./DETAILED.md)
+- **SDK Guide:** [packages/sdk/README.md](./packages/sdk/README.md)
+- **Adapter Development:** [docs/ADAPTER_SDK.md](./docs/ADAPTER_SDK.md)
+- **Templates:** [templates/README.md](./templates/README.md)
+- **Audit Report:** [AUDIT_REPORT.md](./AUDIT_REPORT.md)
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+We welcome contributions! Fork, create a feature branch, and submit a PR.
 
 ## License
 
-FSL-1.1-MIT License. See LICENSE file for details.
+FSL-1.1-MIT - See [LICENSE](./LICENSE) for details.

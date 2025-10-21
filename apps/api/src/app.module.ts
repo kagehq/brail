@@ -22,6 +22,8 @@ import { SslModule } from './ssl/ssl.module';
 import { EnvModule } from './env/env.module';
 import { OrgsModule } from './orgs/orgs.module';
 import { AdapterCatalogModule } from './catalog/adapter-catalog.module';
+import { TemplatesModule } from './templates/templates.module';
+import { AdapterBuilderModule } from './adapter-builder/adapter-builder.module';
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { AdapterCatalogModule } from './catalog/adapter-catalog.module';
     EnvModule,
     OrgsModule,
     AdapterCatalogModule,
+    TemplatesModule,
+    AdapterBuilderModule,
     PublicModule,
   ],
 })

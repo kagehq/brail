@@ -1,6 +1,6 @@
 {
   "name": "create-br-adapter",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "Scaffold a new Brail deployment adapter",
   "type": "module",
   "bin": {

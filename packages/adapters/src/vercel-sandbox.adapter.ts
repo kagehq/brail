@@ -1,17 +1,17 @@
+import { readFile, readdir, writeFile, mkdtemp, rm } from 'fs/promises';
+import { join, relative } from 'path';
+import { tmpdir } from 'os';
+import { spawn } from 'child_process';
 import { DeployAdapter, AdapterContext, UploadInput, ActivateInput, RollbackInput, ValidationResult } from './types.js';
 
 export interface VercelSandboxConfig {
-  teamId: string;
-  projectId: string;
+  teamId?: string;
+  projectId?: string;
   token: string;
   runtime: 'node22' | 'python3.13';
-  vcpus: number;
-  timeout: number; // in milliseconds
-  ports: number[];
-  source: {
-    url: string;
-    type: 'git';
-  };
+  vcpus?: number;
+  timeout?: number; // in milliseconds
+  ports?: number[];
   buildCommand?: string;
   startCommand?: string;
   workingDirectory?: string;
@@ -22,48 +22,17 @@ export const vercelSandboxAdapter: DeployAdapter = {
 
   validateConfig(config: unknown): ValidationResult {
     if (!config || typeof config !== 'object') {
-      throw new Error('Configuration must be an object');
+      return { valid: false, reason: 'Config must be an object' };
     }
 
     const cfg = config as Record<string, unknown>;
 
-    // Required fields
-    if (!cfg.teamId || typeof cfg.teamId !== 'string') {
-      throw new Error('teamId is required and must be a string');
-    }
-    if (!cfg.projectId || typeof cfg.projectId !== 'string') {
-      throw new Error('projectId is required and must be a string');
-    }
     if (!cfg.token || typeof cfg.token !== 'string') {
-      throw new Error('token is required and must be a string');
+      return { valid: false, reason: 'token is required' };
     }
+
     if (!cfg.runtime || !['node22', 'python3.13'].includes(cfg.runtime as string)) {
-      throw new Error('runtime must be either "node22" or "python3.13"');
-    }
-    if (!cfg.source || typeof cfg.source !== 'object') {
-      throw new Error('source is required and must be an object');
-    }
-    const source = cfg.source as Record<string, unknown>;
-    if (!source.url || typeof source.url !== 'string') {
-      throw new Error('source.url is required and must be a string');
-    }
-    if (source.type !== 'git') {
-      throw new Error('source.type must be "git"');
-    }
-
-    // Optional fields with defaults
-    const vcpus = cfg.vcpus ? Number(cfg.vcpus) : 2;
-    const timeout = cfg.timeout ? Number(cfg.timeout) : 300000; // 5 minutes default
-    const ports = cfg.ports ? (Array.isArray(cfg.ports) ? cfg.ports.map(Number) : [Number(cfg.ports)]) : [3000];
-
-    if (vcpus < 1 || vcpus > 4) {
-      throw new Error('vcpus must be between 1 and 4');
-    }
-    if (timeout < 60000 || timeout > 18000000) { // 1 minute to 5 hours
-      throw new Error('timeout must be between 60000ms (1 minute) and 18000000ms (5 hours)');
-    }
-    if (!Array.isArray(ports) || ports.some(p => p < 1 || p > 65535)) {
-      throw new Error('ports must be an array of valid port numbers (1-65535)');
+      return { valid: false, reason: 'runtime must be either "node22" or "python3.13"' };
     }
 
     return { valid: true };
@@ -71,119 +40,227 @@ export const vercelSandboxAdapter: DeployAdapter = {
 
   async upload(ctx: AdapterContext, input: UploadInput): Promise<{ destinationRef?: string; platformDeploymentId?: string; previewUrl?: string }> {
     const config = input.config as VercelSandboxConfig;
+    const { deployId, filesDir, site } = input;
     
-    ctx.logger.info('🚀 Starting Vercel Sandbox deployment...');
-    ctx.logger.info(`📦 Runtime: ${config.runtime}`);
-    ctx.logger.info(`💻 vCPUs: ${config.vcpus}`);
-    ctx.logger.info(`⏱️ Timeout: ${config.timeout}ms`);
-    ctx.logger.info(`🔗 Source: ${config.source.url}`);
+    ctx.logger.info('[Vercel Sandbox] Starting sandbox creation...');
+    ctx.logger.info(`[Vercel Sandbox] Runtime: ${config.runtime}`);
+    ctx.logger.info(`[Vercel Sandbox] vCPUs: ${config.vcpus || 2}`);
 
     try {
-      // Create sandbox using Vercel Sandbox SDK
-      const sandbox = await createSandbox(config, ctx);
-      
-      ctx.logger.info('✅ Sandbox created successfully');
-      ctx.logger.info(`🌐 Sandbox URL: ${sandbox.url}`);
-      
-      return {
-        destinationRef: sandbox.id,
-        platformDeploymentId: sandbox.id,
-        previewUrl: sandbox.url,
-      };
+      // Step 1: Create a temporary git repository from files
+      const gitRepoUrl = await createTempGitRepo(ctx, filesDir, deployId);
+      ctx.logger.info(`[Vercel Sandbox] Created temporary git repo: ${gitRepoUrl}`);
 
+      // Step 2: Create the sandbox via Vercel Sandbox API
+      const sandbox = await createSandbox(ctx, config, gitRepoUrl);
+      ctx.logger.info(`[Vercel Sandbox] Sandbox created: ${sandbox.id}`);
+
+      // Step 3: Run build command if specified
+      if (config.buildCommand) {
+        ctx.logger.info(`[Vercel Sandbox] Running build command: ${config.buildCommand}`);
+        await runSandboxCommand(ctx, config, sandbox.id, config.buildCommand);
+      }
+
+      // Step 4: Start the application
+      const startCommand = config.startCommand || 'npm start';
+      ctx.logger.info(`[Vercel Sandbox] Starting application: ${startCommand}`);
+      await runSandboxCommand(ctx, config, sandbox.id, startCommand, true);
+
+      // Step 5: Get the sandbox URL
+      const port = config.ports?.[0] || 3000;
+      const sandboxUrl = `https://${sandbox.id}.sandbox.vercel.app`;
+      ctx.logger.info(`[Vercel Sandbox] Sandbox URL: ${sandboxUrl}`);
+
+      return {
+        destinationRef: sandboxUrl,
+        platformDeploymentId: sandbox.id,
+        previewUrl: sandboxUrl,
+      };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      ctx.logger.error(`❌ Vercel Sandbox deployment failed: ${errorMessage}`);
+      ctx.logger.error(`[Vercel Sandbox] Deployment failed: ${errorMessage}`);
       throw error;
     }
   },
 
   async activate(ctx: AdapterContext, input: ActivateInput): Promise<void> {
-    ctx.logger.info('🔄 Activating Vercel Sandbox deployment...');
-
-    try {
-      const config = input.config as VercelSandboxConfig;
-      
-      // For now, just log the activation
-      // In a real implementation, this would start the sandbox
-      ctx.logger.info('✅ Vercel Sandbox activated successfully');
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      ctx.logger.error(`❌ Vercel Sandbox activation failed: ${errorMessage}`);
-      throw error;
-    }
+    // Vercel Sandbox is already active after creation
+    ctx.logger.info('[Vercel Sandbox] Sandbox is already active and running');
   },
 
-  async rollback(ctx: AdapterContext, input: RollbackInput): Promise<void> {
-    ctx.logger.info('🔄 Rolling back Vercel Sandbox deployment...');
+  async rollback(ctx: AdapterContext, input: RollbackInput & { platformDeploymentId?: string }): Promise<void> {
+    const config = input.config as VercelSandboxConfig;
+    const platformDeploymentId = (input as any).platformDeploymentId;
 
-    try {
-      // For now, just log the rollback
-      // In a real implementation, this would stop the sandbox
-      ctx.logger.info('✅ Vercel Sandbox rolled back successfully');
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      ctx.logger.error(`❌ Vercel Sandbox rollback failed: ${errorMessage}`);
-      throw error;
+    if (!platformDeploymentId) {
+      throw new Error('platformDeploymentId is required for Vercel Sandbox rollback');
     }
+
+    ctx.logger.info(`[Vercel Sandbox] Stopping current sandbox and starting previous: ${platformDeploymentId}`);
+    
+    // Vercel Sandbox doesn't have traditional rollback
+    // You would need to stop the current sandbox and create a new one from the old code
+    ctx.logger.warn('[Vercel Sandbox] Rollback requires recreating sandbox from previous code version');
+    
+    await stopSandbox(ctx, config, platformDeploymentId);
+    ctx.logger.info('[Vercel Sandbox] Sandbox stopped');
   }
 };
 
 // Helper functions
-async function createSandbox(config: VercelSandboxConfig, ctx: AdapterContext) {
-    // This would integrate with the Vercel Sandbox SDK
-    // For now, we'll simulate the API calls
-    
-    ctx.logger.info('📦 Creating Vercel Sandbox...');
-    
-    // Simulate sandbox creation
-    const sandboxId = `sandbox_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const sandboxUrl = `https://${sandboxId}.sandbox.vercel.app`;
-    
-    // In a real implementation, this would call the Vercel Sandbox API
-    // const sandbox = await Sandbox.create({
-    //   teamId: config.teamId,
-    //   projectId: config.projectId,
-    //   token: config.token,
-    //   source: config.source,
-    //   resources: { vcpus: config.vcpus },
-    //   timeout: config.timeout,
-    //   ports: config.ports,
-    //   runtime: config.runtime,
-    // });
 
-    return {
-      id: sandboxId,
-      url: sandboxUrl,
-      status: 'created',
-    };
+/**
+ * Create a temporary git repository from local files
+ * In a real implementation, this would either:
+ * 1. Push files to a temporary GitHub Gist
+ * 2. Use GitHub API to create a temporary repo
+ * 3. Upload files directly via Vercel's file API (if available)
+ * 
+ * For now, this is a simplified implementation that shows the concept
+ */
+async function createTempGitRepo(
+  ctx: AdapterContext,
+  filesDir: string,
+  deployId: string,
+): Promise<string> {
+  ctx.logger.warn('[Vercel Sandbox] Note: Vercel Sandbox requires a git repository URL');
+  ctx.logger.warn('[Vercel Sandbox] In production, you would need to push files to a git repository');
+  
+  // For demonstration purposes, return a placeholder URL
+  // In a real implementation, you would:
+  // 1. Create a temporary GitHub repo or gist
+  // 2. Commit and push the files
+  // 3. Return the repo URL
+  
+  return `https://github.com/temp/${deployId}.git`;
 }
 
-async function startSandbox(sandboxId: string, config: VercelSandboxConfig, ctx: AdapterContext) {
-    ctx.logger.info(`🚀 Starting sandbox ${sandboxId}...`);
-    
-    // In a real implementation, this would call the Vercel Sandbox API
-    // await sandbox.start();
-    
-    ctx.logger.info('✅ Sandbox started successfully');
+/**
+ * Create a Vercel Sandbox using the REST API
+ * Based on: https://vercel.com/docs/vercel-sandbox
+ */
+async function createSandbox(
+  ctx: AdapterContext,
+  config: VercelSandboxConfig,
+  gitRepoUrl: string,
+): Promise<{ id: string }> {
+  const url = 'https://api.vercel.com/v1/sandbox';
+  const headers = getHeaders(config);
+
+  const body = {
+    source: {
+      url: gitRepoUrl,
+      type: 'git',
+    },
+    resources: {
+      vcpus: config.vcpus || 2,
+    },
+    timeout: config.timeout || 300000, // 5 minutes default
+    ports: config.ports || [3000],
+    runtime: config.runtime,
+    ...(config.workingDirectory && { workingDirectory: config.workingDirectory }),
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      ...headers,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to create Vercel Sandbox: ${response.status} ${error}`);
+  }
+
+  const sandbox: any = await response.json();
+  return {
+    id: sandbox.id || sandbox.sandboxId,
+  };
 }
 
-async function stopSandbox(sandboxId: string, ctx: AdapterContext) {
-    ctx.logger.info(`🛑 Stopping sandbox ${sandboxId}...`);
-    
-    // In a real implementation, this would call the Vercel Sandbox API
-    // await sandbox.stop();
-    
-    ctx.logger.info('✅ Sandbox stopped successfully');
+/**
+ * Run a command in a Vercel Sandbox
+ */
+async function runSandboxCommand(
+  ctx: AdapterContext,
+  config: VercelSandboxConfig,
+  sandboxId: string,
+  command: string,
+  detached = false,
+): Promise<void> {
+  const url = `https://api.vercel.com/v1/sandbox/${sandboxId}/commands`;
+  const headers = getHeaders(config);
+
+  // Parse command into cmd and args
+  const parts = command.split(' ');
+  const cmd = parts[0];
+  const args = parts.slice(1);
+
+  const body = {
+    cmd,
+    args,
+    detached,
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      ...headers,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to run sandbox command: ${response.status} ${error}`);
+  }
+
+  if (!detached) {
+    const result: any = await response.json();
+    if (result.exitCode !== 0) {
+      throw new Error(`Command failed with exit code ${result.exitCode}`);
+    }
+  }
 }
 
-async function deleteSandbox(sandboxId: string, ctx: AdapterContext) {
-    ctx.logger.info(`🗑️ Deleting sandbox ${sandboxId}...`);
-    
-    // In a real implementation, this would call the Vercel Sandbox API
-    // await sandbox.delete();
-    
-    ctx.logger.info('✅ Sandbox deleted successfully');
+/**
+ * Stop a Vercel Sandbox
+ */
+async function stopSandbox(
+  ctx: AdapterContext,
+  config: VercelSandboxConfig,
+  sandboxId: string,
+): Promise<void> {
+  const url = `https://api.vercel.com/v1/sandbox/${sandboxId}`;
+  const headers = getHeaders(config);
+
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to stop sandbox: ${response.status} ${error}`);
+  }
+}
+
+function getHeaders(config: VercelSandboxConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${config.token}`,
+  };
+
+  if (config.teamId) {
+    headers['x-vercel-team-id'] = config.teamId;
+  }
+
+  if (config.projectId) {
+    headers['x-vercel-project-id'] = config.projectId;
+  }
+
+  return headers;
 }

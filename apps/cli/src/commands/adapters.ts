@@ -78,16 +78,25 @@ const FALLBACK_ADAPTERS: CatalogEntry[] = [
     description: 'Publish repositories to GitHub Pages.',
   },
   {
+    name: 'cloudflare-workers',
+    title: 'Cloudflare Workers',
+    category: 'platform',
+    description: 'Serverless functions on Cloudflare edge network with KV storage.',
+    features: ['Edge deployment', 'KV storage', 'Instant global distribution'],
+  },
+  {
     name: 'cloudflare-sandbox',
-    title: 'Cloudflare Sandbox',
+    title: 'Cloudflare Sandbox (Beta)',
     category: 'dynamic',
-    description: 'Sandboxed runtime on Cloudflare Workers.',
+    description: 'Secure code execution in isolated containers powered by Durable Objects.',
+    features: ['Container isolation', 'AI code execution', 'Preview URLs'],
   },
   {
     name: 'vercel-sandbox',
     title: 'Vercel Sandbox',
     category: 'dynamic',
-    description: 'Isolated environments on Vercel with runtime controls.',
+    description: 'Isolated development environments with node22/python3.13 runtimes.',
+    features: ['Configurable vCPUs', 'Command execution', 'Git-based deployments'],
   },
 ];
 

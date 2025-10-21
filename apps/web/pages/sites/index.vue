@@ -11,18 +11,30 @@
           <p class="text-gray-500 text-sm">Manage and deploy your static sites</p>
         </div>
         <div class="flex items-center gap-3">
-          <!-- <NuxtLink
+          <NuxtLink
+            to="/templates"
+            class="px-4 py-2 text-sm font-semibold text-gray-300 border border-gray-500/30 rounded-lg hover:text-white hover:border-gray-500/50 transition-all"
+          >
+            Templates
+          </NuxtLink>
+          <NuxtLink
+            to="/adapter-builder"
+            class="px-4 py-2 text-sm font-semibold text-gray-300 border border-gray-500/30 rounded-lg hover:text-white hover:border-gray-500/50 transition-all"
+          >
+            Build Adapter
+          </NuxtLink>
+          <NuxtLink
             to="/adapters"
             class="px-4 py-2 text-sm font-semibold text-gray-300 border border-gray-500/30 rounded-lg hover:text-white hover:border-gray-500/50 transition-all"
           >
             Adapter Catalog
-          </NuxtLink> -->
-          <!-- <NuxtLink
+          </NuxtLink>
+          <NuxtLink
             to="/settings/team"
             class="px-4 py-2 text-sm font-semibold text-gray-300 border border-gray-500/30 rounded-lg hover:text-white hover:border-gray-500/50 transition-all"
           >
             Team Access
-          </NuxtLink> -->
+          </NuxtLink>
           <button
             @click="showCreateModal = true"
             class="bg-blue-300 text-sm font-semibold text-black px-5 py-2.5 rounded-lg hover:bg-blue-400 transition-all hover:shadow-lg hover:shadow-blue-300/20 hover:scale-105 flex items-center gap-2"
@@ -209,7 +221,13 @@ const newSiteName = ref('');
 const creating = ref(false);
 const createError = ref('');
 
+let isLoading = false;
+
 onMounted(async () => {
+  // Prevent multiple simultaneous loads
+  if (isLoading) return;
+  isLoading = true;
+  
   try {
     // Check if user is authenticated
     const config = useRuntimeConfig();
@@ -218,19 +236,28 @@ onMounted(async () => {
     });
     
     if (!response.ok) {
-      router.push('/login');
+      await router.push('/login');
       return;
     }
     
     user.value = await response.json();
     
     // Load sites
-    sites.value = await api.listSites();
+    try {
+      sites.value = await api.listSites();
+    } catch (siteError: any) {
+      console.error('Failed to load sites:', siteError);
+      // If sites load fails due to auth, redirect to login
+      if (siteError.message?.includes('Unauthorized') || siteError.message?.includes('401')) {
+        await router.push('/login');
+      }
+    }
   } catch (error) {
-    console.error('Failed to load sites:', error);
-    router.push('/login');
+    console.error('Failed to authenticate:', error);
+    await router.push('/login');
   } finally {
     loading.value = false;
+    isLoading = false;
   }
 });
 

@@ -34,12 +34,14 @@
               </optgroup>
               <optgroup label="Platform Adapters">
                 <option value="adapter:vercel">Vercel</option>
-                <option value="adapter:cloudflare">Cloudflare</option>
+                <option value="adapter:cloudflare-pages">Cloudflare Pages</option>
+                <option value="adapter:cloudflare-workers">Cloudflare Workers</option>
                 <option value="adapter:cloudflare-sandbox">Cloudflare Sandbox</option>
                 <option value="adapter:vercel-sandbox">Vercel Sandbox</option>
                 <option value="adapter:netlify">Netlify</option>
                 <option value="adapter:railway">Railway</option>
                 <option value="adapter:fly">Fly.io</option>
+                <option value="adapter:render">Render</option>
                 <option value="adapter:s3">S3</option>
                 <option value="adapter:github-pages">GitHub Pages</option>
                 <option value="adapter:ftp">FTP</option>
@@ -440,12 +442,14 @@ const scopes = [
   { value: 'runtime:preview', label: 'Runtime (Preview)' },
   { value: 'runtime:production', label: 'Runtime (Production)' },
   { value: 'adapter:vercel', label: 'Vercel' },
-  { value: 'adapter:cloudflare', label: 'Cloudflare' },
+  { value: 'adapter:cloudflare-pages', label: 'Cloudflare Pages' },
+  { value: 'adapter:cloudflare-workers', label: 'Cloudflare Workers' },
   { value: 'adapter:cloudflare-sandbox', label: 'Cloudflare Sandbox' },
   { value: 'adapter:vercel-sandbox', label: 'Vercel Sandbox' },
   { value: 'adapter:netlify', label: 'Netlify' },
   { value: 'adapter:railway', label: 'Railway' },
   { value: 'adapter:fly', label: 'Fly.io' },
+  { value: 'adapter:render', label: 'Render' },
   { value: 'adapter:s3', label: 'S3' },
   { value: 'adapter:github-pages', label: 'GitHub Pages' },
   { value: 'adapter:ftp', label: 'FTP' },
@@ -480,10 +484,14 @@ const selectedScopeDescription = computed(() => {
     'runtime:preview': 'Variables for preview deployments',
     'runtime:production': 'Variables for production deployments',
     'adapter:vercel': 'Vercel-specific configuration (API tokens, project IDs)',
-    'adapter:cloudflare': 'Cloudflare Pages-specific configuration',
+    'adapter:cloudflare-pages': 'Cloudflare Pages-specific configuration',
+    'adapter:cloudflare-workers': 'Cloudflare Workers-specific configuration (KV namespace, etc.)',
+    'adapter:cloudflare-sandbox': 'Cloudflare Sandbox-specific configuration',
+    'adapter:vercel-sandbox': 'Vercel Sandbox-specific configuration',
     'adapter:netlify': 'Netlify-specific configuration',
     'adapter:railway': 'Railway-specific configuration',
     'adapter:fly': 'Fly.io-specific configuration',
+    'adapter:render': 'Render-specific configuration',
     'adapter:s3': 'S3-specific configuration (bucket, credentials)',
     'adapter:github-pages': 'GitHub Pages-specific configuration',
     'adapter:ftp': 'FTP-specific configuration',

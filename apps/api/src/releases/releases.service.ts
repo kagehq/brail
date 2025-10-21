@@ -6,6 +6,7 @@ import { ProfilesService } from '../profiles/profiles.service';
 import { HealthService } from '../health/health.service';
 import { EnvService } from '../env/env.service';
 import { BuildLogsService } from '../build-logs/build-logs.service';
+import { AuditService } from '../audit/audit.service';
 import type { AdapterContext } from '@br/adapters';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -33,6 +34,7 @@ export class ReleasesService {
     private readonly healthService: HealthService,
     private readonly envService: EnvService,
     private readonly buildLogsService: BuildLogsService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -320,6 +322,25 @@ export class ReleasesService {
         outputDir: '',
       });
 
+      // Audit log with adapter metadata
+      await this.auditService.record(
+        target === 'production' ? 'release.promoted' : 'deploy.activated',
+        {
+          orgId: deploy.site.orgId,
+          siteId: deploy.siteId,
+          deployId,
+          userId: deploy.deployedBy || undefined,
+          userEmail: deploy.deployedByEmail || undefined,
+          meta: {
+            adapter: adapter.name,
+            target,
+            platformDeploymentId: release?.platformDeploymentId,
+            previewUrl: release?.previewUrl,
+            comment: comment || null,
+          },
+        },
+      );
+
       return {
         success: true,
         deployId,
@@ -423,6 +444,16 @@ export class ReleasesService {
       logger: this.adapterLogger,
     };
 
+    // Get current active release (before rollback) for audit log
+    const currentActiveRelease = await this.prisma.release.findFirst({
+      where: {
+        siteId,
+        adapter: adapter.name,
+        status: 'active',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
     // Get release to access platform deployment ID
     const release = await this.prisma.release.findFirst({
       where: {
@@ -472,7 +503,21 @@ export class ReleasesService {
       data: { activeDeployId: toDeployId },
     });
 
-    this.logger.log(`Rolled back to deploy ${toDeployId}`);
+    this.logger.log(`Rolled back to deploy ${toDeployId} on ${adapter.name}`);
+
+    // Audit log with adapter metadata
+    await this.auditService.record('release.rolled_back', {
+      orgId: deploy.site.orgId,
+      siteId,
+      deployId: toDeployId,
+      userId: deploy.deployedBy || undefined,
+      userEmail: deploy.deployedByEmail || undefined,
+      meta: {
+        adapter: adapter.name,
+        fromDeployId: currentActiveRelease?.deployId,
+        toDeployId,
+      },
+    });
 
     return {
       success: true,

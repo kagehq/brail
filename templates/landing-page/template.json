@@ -1,0 +1,47 @@
+{
+  "id": "landing-page",
+  "name": "Landing Page",
+  "description": "Modern marketing landing page with hero, features, pricing, and contact sections",
+  "category": "marketing",
+  "tags": ["marketing", "landing", "saas", "startup"],
+  "author": "Brail",
+  "version": "1.0.0",
+  "tech": ["html", "tailwind", "alpinejs"],
+  "buildRequired": false,
+  "preview": "preview.png",
+  "variables": [
+    {
+      "key": "SITE_TITLE",
+      "label": "Site Title",
+      "description": "Main title for your landing page",
+      "default": "Your Amazing Product",
+      "required": true
+    },
+    {
+      "key": "SITE_DESCRIPTION",
+      "label": "Description",
+      "description": "Short description of your product",
+      "default": "The best solution for your needs",
+      "required": true
+    },
+    {
+      "key": "CTA_TEXT",
+      "label": "Call to Action Text",
+      "description": "Text for the main CTA button",
+      "default": "Get Started Free",
+      "required": false
+    },
+    {
+      "key": "PRIMARY_COLOR",
+      "label": "Primary Color",
+      "description": "Primary brand color (hex code)",
+      "default": "#3b82f6",
+      "required": false
+    }
+  ],
+  "adapters": {
+    "recommended": ["vercel", "cloudflare-pages", "netlify"],
+    "supported": "all"
+  }
+}
+

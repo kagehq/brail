@@ -690,3 +690,180 @@ async function buildFlyConfig(options: ProfilesOptions): Promise<any> {
   return config;
 }
 
+/**
+ * Get profile details
+ */
+export async function profilesGetCommand(options: { site?: string; id?: string }) {
+  const config = await requireConfig();
+
+  let siteId = options.site;
+  let profileId = options.id;
+
+  if (!siteId || !profileId) {
+    console.log(chalk.red('\n✗ --site and --id are required\n'));
+    process.exit(1);
+  }
+
+  const spinner = ora('Loading profile...').start();
+
+  try {
+    const response = await fetch(
+      `${config.apiUrl}/v1/sites/${siteId}/profiles/${profileId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${config.token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const profile = await response.json() as any;
+
+    spinner.stop();
+
+    console.log(chalk.bold(`\n📋 Profile: ${profile.name}\n`));
+    console.log(chalk.dim(`ID: ${profile.id}`));
+    console.log(chalk.dim(`Adapter: ${profile.adapter}`));
+    console.log(chalk.dim(`Site: ${profile.siteId}`));
+    console.log(chalk.dim(`Created: ${new Date(profile.createdAt).toLocaleString()}`));
+    console.log(chalk.dim(`Updated: ${new Date(profile.updatedAt).toLocaleString()}`));
+    
+    if (profile.isDefault) {
+      console.log(chalk.green('\n✓ This is the default profile'));
+    }
+
+    console.log(chalk.bold('\nConfiguration:'));
+    console.log(chalk.dim(JSON.stringify(profile.config, null, 2)));
+  } catch (error: any) {
+    spinner.fail(`Failed to load profile: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+/**
+ * Update profile
+ */
+export async function profilesUpdateCommand(options: {
+  site?: string;
+  id?: string;
+  name?: string;
+  config?: string;
+}) {
+  const config = await requireConfig();
+
+  let siteId = options.site;
+  let profileId = options.id;
+
+  if (!siteId || !profileId) {
+    console.log(chalk.red('\n✗ --site and --id are required\n'));
+    process.exit(1);
+  }
+
+  const body: any = {};
+
+  if (options.name) {
+    body.name = options.name;
+  }
+
+  if (options.config) {
+    try {
+      body.config = JSON.parse(options.config);
+    } catch (error) {
+      console.log(chalk.red('\n✗ Invalid JSON for --config\n'));
+      process.exit(1);
+    }
+  }
+
+  if (Object.keys(body).length === 0) {
+    console.log(chalk.yellow('\n⚠ No changes specified. Use --name or --config\n'));
+    process.exit(1);
+  }
+
+  const spinner = ora('Updating profile...').start();
+
+  try {
+    const response = await fetch(
+      `${config.apiUrl}/v1/sites/${siteId}/profiles/${profileId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.token}`,
+        },
+        body: JSON.stringify(body),
+      },
+    );
+
+    if (!response.ok) {
+      const error: any = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(error.message || `HTTP ${response.status}`);
+    }
+
+    const profile: any = await response.json();
+
+    spinner.succeed(`Profile updated: ${chalk.cyan(profile.name)}`);
+  } catch (error: any) {
+    spinner.fail(`Failed to update profile: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+/**
+ * Delete profile
+ */
+export async function profilesRemoveCommand(options: {
+  site?: string;
+  id?: string;
+  yes?: boolean;
+}) {
+  const config = await requireConfig();
+
+  let siteId = options.site;
+  let profileId = options.id;
+
+  if (!siteId || !profileId) {
+    console.log(chalk.red('\n✗ --site and --id are required\n'));
+    process.exit(1);
+  }
+
+  if (!options.yes) {
+    const answer = await prompts({
+      type: 'confirm',
+      name: 'confirm',
+      message: `Delete profile ${profileId}?`,
+      initial: false,
+    });
+
+    if (!answer.confirm) {
+      console.log(chalk.dim('\nCancelled'));
+      process.exit(0);
+    }
+  }
+
+  const spinner = ora('Deleting profile...').start();
+
+  try {
+    const response = await fetch(
+      `${config.apiUrl}/v1/sites/${siteId}/profiles/${profileId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${config.token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    spinner.succeed('Profile deleted');
+  } catch (error: any) {
+    spinner.fail(`Failed to delete profile: ${error.message}`);
+    process.exit(1);
+  }
+}
+
