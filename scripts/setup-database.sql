@@ -371,66 +371,134 @@ CREATE INDEX IF NOT EXISTS "AuditEvent_deployId_idx" ON "AuditEvent"("deployId")
 -- ============================================================================
 
 -- Organization relationships
-ALTER TABLE "OrgMember" ADD CONSTRAINT "OrgMember_userId_fkey" 
-    FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'OrgMember_userId_fkey') THEN
+        ALTER TABLE "OrgMember" ADD CONSTRAINT "OrgMember_userId_fkey" 
+            FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
-ALTER TABLE "OrgMember" ADD CONSTRAINT "OrgMember_orgId_fkey" 
-    FOREIGN KEY ("orgId") REFERENCES "Org"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'OrgMember_orgId_fkey') THEN
+        ALTER TABLE "OrgMember" ADD CONSTRAINT "OrgMember_orgId_fkey" 
+            FOREIGN KEY ("orgId") REFERENCES "Org"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
-ALTER TABLE "OrgInvite" ADD CONSTRAINT "OrgInvite_orgId_fkey" 
-    FOREIGN KEY ("orgId") REFERENCES "Org"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'OrgInvite_orgId_fkey') THEN
+        ALTER TABLE "OrgInvite" ADD CONSTRAINT "OrgInvite_orgId_fkey" 
+            FOREIGN KEY ("orgId") REFERENCES "Org"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- Site relationships
-ALTER TABLE "Site" ADD CONSTRAINT "Site_orgId_fkey" 
-    FOREIGN KEY ("orgId") REFERENCES "Org"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Site_orgId_fkey') THEN
+        ALTER TABLE "Site" ADD CONSTRAINT "Site_orgId_fkey" 
+            FOREIGN KEY ("orgId") REFERENCES "Org"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- Deploy relationships
-ALTER TABLE "Deploy" ADD CONSTRAINT "Deploy_siteId_fkey" 
-    FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Deploy_siteId_fkey') THEN
+        ALTER TABLE "Deploy" ADD CONSTRAINT "Deploy_siteId_fkey" 
+            FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- Patch relationships
-ALTER TABLE "Patch" ADD CONSTRAINT "Patch_baseDeployId_fkey" 
-    FOREIGN KEY ("baseDeployId") REFERENCES "Deploy"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Patch_baseDeployId_fkey') THEN
+        ALTER TABLE "Patch" ADD CONSTRAINT "Patch_baseDeployId_fkey" 
+            FOREIGN KEY ("baseDeployId") REFERENCES "Deploy"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
-ALTER TABLE "Patch" ADD CONSTRAINT "Patch_newDeployId_fkey" 
-    FOREIGN KEY ("newDeployId") REFERENCES "Deploy"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Patch_newDeployId_fkey') THEN
+        ALTER TABLE "Patch" ADD CONSTRAINT "Patch_newDeployId_fkey" 
+            FOREIGN KEY ("newDeployId") REFERENCES "Deploy"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- Domain relationships
-ALTER TABLE "Domain" ADD CONSTRAINT "Domain_siteId_fkey" 
-    FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Domain_siteId_fkey') THEN
+        ALTER TABLE "Domain" ADD CONSTRAINT "Domain_siteId_fkey" 
+            FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
-ALTER TABLE "SslCertificate" ADD CONSTRAINT "SslCertificate_domainId_fkey" 
-    FOREIGN KEY ("domainId") REFERENCES "Domain"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'SslCertificate_domainId_fkey') THEN
+        ALTER TABLE "SslCertificate" ADD CONSTRAINT "SslCertificate_domainId_fkey" 
+            FOREIGN KEY ("domainId") REFERENCES "Domain"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- Token relationships
-ALTER TABLE "Token" ADD CONSTRAINT "Token_userId_fkey" 
-    FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Token_userId_fkey') THEN
+        ALTER TABLE "Token" ADD CONSTRAINT "Token_userId_fkey" 
+            FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- Connection Profile relationships
-ALTER TABLE "ConnectionProfile" ADD CONSTRAINT "ConnectionProfile_siteId_fkey" 
-    FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ConnectionProfile_siteId_fkey') THEN
+        ALTER TABLE "ConnectionProfile" ADD CONSTRAINT "ConnectionProfile_siteId_fkey" 
+            FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- Release relationships
-ALTER TABLE "Release" ADD CONSTRAINT "Release_siteId_fkey" 
-    FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Release_siteId_fkey') THEN
+        ALTER TABLE "Release" ADD CONSTRAINT "Release_siteId_fkey" 
+            FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
-ALTER TABLE "Release" ADD CONSTRAINT "Release_deployId_fkey" 
-    FOREIGN KEY ("deployId") REFERENCES "Deploy"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Release_deployId_fkey') THEN
+        ALTER TABLE "Release" ADD CONSTRAINT "Release_deployId_fkey" 
+            FOREIGN KEY ("deployId") REFERENCES "Deploy"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- Environment Variable relationships
-ALTER TABLE "EnvVar" ADD CONSTRAINT "EnvVar_siteId_fkey" 
-    FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'EnvVar_siteId_fkey') THEN
+        ALTER TABLE "EnvVar" ADD CONSTRAINT "EnvVar_siteId_fkey" 
+            FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- Build Log relationships
-ALTER TABLE "BuildLog" ADD CONSTRAINT "BuildLog_siteId_fkey" 
-    FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BuildLog_siteId_fkey') THEN
+        ALTER TABLE "BuildLog" ADD CONSTRAINT "BuildLog_siteId_fkey" 
+            FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
-ALTER TABLE "BuildLog" ADD CONSTRAINT "BuildLog_deployId_fkey" 
-    FOREIGN KEY ("deployId") REFERENCES "Deploy"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BuildLog_deployId_fkey') THEN
+        ALTER TABLE "BuildLog" ADD CONSTRAINT "BuildLog_deployId_fkey" 
+            FOREIGN KEY ("deployId") REFERENCES "Deploy"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- Deployment Log relationships
-ALTER TABLE "DeploymentLog" ADD CONSTRAINT "DeploymentLog_deployId_fkey" 
-    FOREIGN KEY ("deployId") REFERENCES "Deploy"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'DeploymentLog_deployId_fkey') THEN
+        ALTER TABLE "DeploymentLog" ADD CONSTRAINT "DeploymentLog_deployId_fkey" 
+            FOREIGN KEY ("deployId") REFERENCES "Deploy"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- ============================================================================
 -- Prisma Migration Tracking
