@@ -11,18 +11,18 @@
           <p class="text-gray-500 text-sm">Manage and deploy your static sites</p>
         </div>
         <div class="flex items-center gap-3">
-          <NuxtLink
+          <!-- <NuxtLink
             to="/adapters"
             class="px-4 py-2 text-sm font-semibold text-gray-300 border border-gray-500/30 rounded-lg hover:text-white hover:border-gray-500/50 transition-all"
           >
             Adapter Catalog
-          </NuxtLink>
-          <NuxtLink
+          </NuxtLink> -->
+          <!-- <NuxtLink
             to="/settings/team"
             class="px-4 py-2 text-sm font-semibold text-gray-300 border border-gray-500/30 rounded-lg hover:text-white hover:border-gray-500/50 transition-all"
           >
             Team Access
-          </NuxtLink>
+          </NuxtLink> -->
           <button
             @click="showCreateModal = true"
             class="bg-blue-300 text-sm font-semibold text-black px-5 py-2.5 rounded-lg hover:bg-blue-400 transition-all hover:shadow-lg hover:shadow-blue-300/20 hover:scale-105 flex items-center gap-2"
