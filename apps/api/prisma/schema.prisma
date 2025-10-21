@@ -8,6 +8,8 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // Disable prepared statements for Supabase connection pooler compatibility
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // ============================================================================
