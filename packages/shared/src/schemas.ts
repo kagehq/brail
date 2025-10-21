@@ -42,6 +42,8 @@ export const DeploySchema = z.object({
   deployedBy: z.string().nullable().optional(),
   deployedByEmail: z.string().nullable().optional(),
   duration: z.number().int().nullable().optional(),
+  previewUrl: z.string().nullable().optional(),
+  platformDeploymentId: z.string().nullable().optional(),
   createdAt: z.date().or(z.string()),
   updatedAt: z.date().or(z.string()),
 });

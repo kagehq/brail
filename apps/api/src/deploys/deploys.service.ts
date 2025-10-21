@@ -5,6 +5,12 @@ import { SitesService } from '../sites/sites.service';
 import { LogsService } from '../logs/logs.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { AuditService } from '../audit/audit.service';
+import { ProfilesService } from '../profiles/profiles.service';
+import { AdapterRegistry } from '../adapters/adapter.registry';
+import type { AdapterContext } from '@br/adapters';
+import * as path from 'path';
+import * as fs from 'fs/promises';
+import * as os from 'os';
 
 @Injectable()
 export class DeploysService {
@@ -18,6 +24,8 @@ export class DeploysService {
     private readonly logsService: LogsService,
     private readonly notifications: NotificationsGateway,
     private readonly audit: AuditService,
+    private readonly profiles: ProfilesService,
+    private readonly adapterRegistry: AdapterRegistry,
   ) {}
 
   async create(siteId: string, userId?: string, userEmail?: string, req?: any) {
@@ -233,6 +241,26 @@ export class DeploysService {
     const displaySize = Number(sizeMB) >= 1 ? `${sizeMB} MB` : `${sizeKB} KB`;
     await deployLogger.info(`Deployment size: ${deploy.fileCount} files (${displaySize})`);
 
+    // Check if site has a connection profile (external adapter)
+    let profile;
+    try {
+      profile = await this.profiles.getDefault(deploy.siteId);
+      await deployLogger.info(`Using adapter: ${profile.adapter}`);
+    } catch (error) {
+      // No default profile - use Brail hosting
+      await deployLogger.info('Using Brail hosting (no adapter configured)');
+    }
+
+    // If we have a profile, use the adapter
+    if (profile) {
+      return this.activateWithAdapter(deploy, site, profile, comment, req, deployLogger);
+    }
+
+    // Otherwise, use default Brail hosting
+    return this.activateWithBrailHosting(deploy, site, comment, req, deployLogger);
+  }
+
+  private async activateWithBrailHosting(deploy: any, site: any, comment: string | undefined, req: any, deployLogger: any) {
     // Check if there's a currently active deployment
     const currentlyActive = await this.prisma.deploy.findFirst({
       where: {
@@ -300,7 +328,7 @@ export class DeploysService {
     const duration = Date.now() - new Date(deploy.createdAt).getTime();
     
     const updated = await this.prisma.deploy.update({
-      where: { id: deployId },
+      where: { id: deploy.id },
       data: {
         status: 'active',
         // Only update comment if provided, otherwise keep existing
@@ -316,7 +344,7 @@ export class DeploysService {
     await this.audit.record('deploy.activated', {
       orgId: site.orgId,
       siteId: deploy.siteId,
-      deployId,
+      deployId: deploy.id,
       userId: deploy.deployedBy || undefined,
       userEmail: deploy.deployedByEmail || undefined,
       req,
@@ -342,7 +370,7 @@ export class DeploysService {
     const seconds = ((totalDuration % 60000) / 1000).toFixed(1);
     const timeDisplay = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
     
-    this.logger.log(`Activated deploy ${deployId} for site ${deploy.siteId}`);
+    this.logger.log(`Activated deploy ${deploy.id} for site ${deploy.siteId}`);
     await deployLogger.info(`Deployment activated successfully!`, { publicUrl });
     await deployLogger.info(`Total deployment time: ${timeDisplay}`);
 
@@ -356,6 +384,192 @@ export class DeploysService {
       deploy: updated,
       publicUrl,
     };
+  }
+
+  private async activateWithAdapter(deploy: any, site: any, profile: any, comment: string | undefined, req: any, deployLogger: any) {
+    const startTime = Date.now();
+
+    // Get the adapter
+    const adapter = this.adapterRegistry.getAdapter(profile.adapter);
+    const config = await this.profiles.getDecryptedConfig(profile.id);
+
+    // Create adapter context
+    const adapterContext: AdapterContext = {
+      logger: {
+        info: async (msg: string, meta?: any) => {
+          await deployLogger.info(msg, meta);
+        },
+        warn: async (msg: string, meta?: any) => {
+          await deployLogger.warn(msg, meta);
+        },
+        error: async (msg: string, meta?: any) => {
+          await deployLogger.error(msg, meta);
+        },
+        debug: async (msg: string, meta?: any) => {
+          await deployLogger.debug(msg, meta);
+        },
+      },
+    };
+
+    try {
+      // Download files from storage to temp directory
+      await deployLogger.info('Preparing files for adapter deployment...');
+      const tempDir = await this.downloadDeployFiles(deploy.id, deployLogger);
+
+      try {
+        // Upload files using adapter
+        await deployLogger.info(`Uploading to ${profile.adapter}...`);
+        const uploadResult = await adapter.upload(adapterContext, {
+          deployId: deploy.id,
+          site: {
+            id: site.id,
+            name: site.name,
+          },
+          filesDir: tempDir,
+          config,
+        });
+
+        const previewUrl = uploadResult.previewUrl || uploadResult.destinationRef;
+        const platformDeploymentId = uploadResult.platformDeploymentId;
+
+        if (previewUrl) {
+          await deployLogger.info(`Preview URL: ${previewUrl}`);
+        }
+
+        // Activate using adapter
+        await deployLogger.info('Activating deployment on platform...');
+        await adapter.activate(adapterContext, {
+          deployId: deploy.id,
+          site: {
+            id: site.id,
+            name: site.name,
+          },
+          config,
+          platformDeploymentId: uploadResult.platformDeploymentId,
+        });
+
+        // Deactivate other deploys for this site
+        await deployLogger.info('Deactivating previous deployments');
+        await this.prisma.deploy.updateMany({
+          where: {
+            siteId: deploy.siteId,
+            status: 'active',
+          },
+          data: {
+            status: 'uploaded',
+          },
+        });
+
+        // Update deploy status
+        const duration = Date.now() - new Date(deploy.createdAt).getTime();
+        const updated = await this.prisma.deploy.update({
+          where: { id: deploy.id },
+          data: {
+            status: 'active',
+            ...(comment !== undefined && { comment: comment || null }),
+            duration,
+            previewUrl,
+            platformDeploymentId,
+          },
+        });
+
+        // Update site's activeDeployId
+        await this.sites.updateActiveDeploy(deploy.siteId, deploy.id);
+
+        // Audit log
+        await this.audit.record('deploy.activated', {
+          orgId: site.orgId,
+          siteId: deploy.siteId,
+          deployId: deploy.id,
+          userId: deploy.deployedBy || undefined,
+          userEmail: deploy.deployedByEmail || undefined,
+          req,
+          meta: { adapter: profile.adapter, previewUrl },
+        });
+
+        // Show timing information
+        const totalDuration = Date.now() - startTime;
+        const minutes = Math.floor(totalDuration / 60000);
+        const seconds = ((totalDuration % 60000) / 1000).toFixed(1);
+        const timeDisplay = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+
+        this.logger.log(`Activated deploy ${deploy.id} on ${profile.adapter} for site ${deploy.siteId}`);
+        await deployLogger.info(`✅ Deployment activated successfully!`);
+        await deployLogger.info(`Total deployment time: ${timeDisplay}`);
+        if (previewUrl) {
+          await deployLogger.info(`🌐 Live at: ${previewUrl}`);
+        }
+
+        return {
+          success: true,
+          deploy: updated,
+          publicUrl: previewUrl,
+        };
+      } finally {
+        // Clean up temp directory
+        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+      }
+    } catch (error: any) {
+      this.logger.error(`Failed to activate deploy ${deploy.id} with adapter ${profile.adapter}: ${error.message}`);
+      await deployLogger.error(`❌ Deployment failed: ${error.message}`);
+      
+      // Mark deploy as failed
+      await this.prisma.deploy.update({
+        where: { id: deploy.id },
+        data: {
+          status: 'failed',
+        },
+      });
+
+      throw error;
+    }
+  }
+
+  private async downloadDeployFiles(deployId: string, deployLogger: any): Promise<string> {
+    // Create temp directory
+    const tempDir = path.join(os.tmpdir(), `brail-deploy-${deployId}-${Date.now()}`);
+    await fs.mkdir(tempDir, { recursive: true });
+
+    // List all files for this deploy
+    const prefix = `deploys/${deployId}/`;
+    const objects = await this.storage.listPrefix(prefix);
+
+    await deployLogger.info(`Downloading ${objects.length} files...`);
+
+    // Download each file
+    let downloaded = 0;
+    for (const obj of objects) {
+      const key = obj.key;
+      const relativePath = key.replace(prefix, '');
+      
+      // Skip internal files
+      if (relativePath === 'manifest.json' || relativePath === 'index.json') {
+        continue;
+      }
+
+      const targetPath = path.join(tempDir, relativePath);
+      
+      // Create directory if needed
+      const targetDir = path.dirname(targetPath);
+      await fs.mkdir(targetDir, { recursive: true });
+
+      // Download file
+      const stream = await this.storage.getObjectStream(key);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk as Buffer);
+      }
+      const content = Buffer.concat(chunks);
+      await fs.writeFile(targetPath, content);
+      
+      downloaded++;
+      if (downloaded % 50 === 0) {
+        await deployLogger.info(`Downloaded ${downloaded}/${objects.length} files...`);
+      }
+    }
+
+    await deployLogger.info(`✓ Downloaded ${downloaded} files to temporary directory`);
+    return tempDir;
   }
 
   async delete(deployId: string, req?: any) {

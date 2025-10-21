@@ -1,20 +1,11 @@
 import { DeployAdapter, AdapterContext, UploadInput, ActivateInput, RollbackInput, ValidationResult } from './types.js';
+import { readFile, readdir } from 'fs/promises';
+import { join, relative } from 'path';
 
 export interface VercelSandboxConfig {
-  teamId: string;
-  projectId: string;
-  token: string;
-  runtime: 'node22' | 'python3.13';
-  vcpus: number;
-  timeout: number; // in milliseconds
-  ports: number[];
-  source: {
-    url: string;
-    type: 'git';
-  };
-  buildCommand?: string;
-  startCommand?: string;
-  workingDirectory?: string;
+  token: string; // Vercel API token
+  teamId?: string; // Optional team ID
+  projectName: string; // Project name
 }
 
 export const vercelSandboxAdapter: DeployAdapter = {
@@ -28,42 +19,11 @@ export const vercelSandboxAdapter: DeployAdapter = {
     const cfg = config as Record<string, unknown>;
 
     // Required fields
-    if (!cfg.teamId || typeof cfg.teamId !== 'string') {
-      throw new Error('teamId is required and must be a string');
-    }
-    if (!cfg.projectId || typeof cfg.projectId !== 'string') {
-      throw new Error('projectId is required and must be a string');
-    }
     if (!cfg.token || typeof cfg.token !== 'string') {
       throw new Error('token is required and must be a string');
     }
-    if (!cfg.runtime || !['node22', 'python3.13'].includes(cfg.runtime as string)) {
-      throw new Error('runtime must be either "node22" or "python3.13"');
-    }
-    if (!cfg.source || typeof cfg.source !== 'object') {
-      throw new Error('source is required and must be an object');
-    }
-    const source = cfg.source as Record<string, unknown>;
-    if (!source.url || typeof source.url !== 'string') {
-      throw new Error('source.url is required and must be a string');
-    }
-    if (source.type !== 'git') {
-      throw new Error('source.type must be "git"');
-    }
-
-    // Optional fields with defaults
-    const vcpus = cfg.vcpus ? Number(cfg.vcpus) : 2;
-    const timeout = cfg.timeout ? Number(cfg.timeout) : 300000; // 5 minutes default
-    const ports = cfg.ports ? (Array.isArray(cfg.ports) ? cfg.ports.map(Number) : [Number(cfg.ports)]) : [3000];
-
-    if (vcpus < 1 || vcpus > 4) {
-      throw new Error('vcpus must be between 1 and 4');
-    }
-    if (timeout < 60000 || timeout > 18000000) { // 1 minute to 5 hours
-      throw new Error('timeout must be between 60000ms (1 minute) and 18000000ms (5 hours)');
-    }
-    if (!Array.isArray(ports) || ports.some(p => p < 1 || p > 65535)) {
-      throw new Error('ports must be an array of valid port numbers (1-65535)');
+    if (!cfg.projectName || typeof cfg.projectName !== 'string') {
+      throw new Error('projectName is required and must be a string');
     }
 
     return { valid: true };
@@ -72,118 +32,195 @@ export const vercelSandboxAdapter: DeployAdapter = {
   async upload(ctx: AdapterContext, input: UploadInput): Promise<{ destinationRef?: string; platformDeploymentId?: string; previewUrl?: string }> {
     const config = input.config as VercelSandboxConfig;
     
-    ctx.logger.info('🚀 Starting Vercel Sandbox deployment...');
-    ctx.logger.info(`📦 Runtime: ${config.runtime}`);
-    ctx.logger.info(`💻 vCPUs: ${config.vcpus}`);
-    ctx.logger.info(`⏱️ Timeout: ${config.timeout}ms`);
-    ctx.logger.info(`🔗 Source: ${config.source.url}`);
+    ctx.logger.info('🚀 Starting Vercel deployment...');
+    ctx.logger.info(`📦 Project: ${config.projectName}`);
 
     try {
-      // Create sandbox using Vercel Sandbox SDK
-      const sandbox = await createSandbox(config, ctx);
+      // Collect all files
+      const files = await collectFiles(input.filesDir);
+      ctx.logger.info(`📁 Found ${files.length} files to deploy`);
+
+      // Create deployment payload
+      const fileContents: Record<string, { data: string }> = {};
       
-      ctx.logger.info('✅ Sandbox created successfully');
-      ctx.logger.info(`🌐 Sandbox URL: ${sandbox.url}`);
+      for (const file of files) {
+        const content = await readFile(file.fullPath);
+        fileContents[file.relativePath] = {
+          data: content.toString('base64'),
+        };
+      }
+
+      // Create deployment using Vercel API
+      const headers: Record<string, string> = {
+        'Authorization': `Bearer ${config.token}`,
+        'Content-Type': 'application/json',
+      };
+
+      if (config.teamId) {
+        headers['x-vercel-team-id'] = config.teamId;
+      }
+
+      const deploymentPayload = {
+        name: config.projectName,
+        files: fileContents,
+        projectSettings: {
+          framework: null, // Auto-detect
+        },
+        target: 'preview', // Create as preview deployment
+      };
+
+      ctx.logger.info('📤 Uploading files to Vercel...');
+      
+      const response = await fetch('https://api.vercel.com/v13/deployments', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(deploymentPayload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Vercel API error (${response.status}): ${errorText}`);
+      }
+
+      const deployment = await response.json() as any;
+      
+      ctx.logger.info('✅ Deployment created successfully');
+      ctx.logger.info(`🆔 Deployment ID: ${deployment.id}`);
+      
+      // Construct preview URL
+      const previewUrl = `https://${deployment.url}`;
+      ctx.logger.info(`🌐 Preview URL: ${previewUrl}`);
+      
+      // Wait for deployment to be ready
+      ctx.logger.info('⏳ Waiting for deployment to be ready...');
+      const readyUrl = await waitForDeployment(deployment.id, config.token, config.teamId, ctx);
       
       return {
-        destinationRef: sandbox.id,
-        platformDeploymentId: sandbox.id,
-        previewUrl: sandbox.url,
+        destinationRef: deployment.url,
+        platformDeploymentId: deployment.id,
+        previewUrl: readyUrl || previewUrl,
       };
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      ctx.logger.error(`❌ Vercel Sandbox deployment failed: ${errorMessage}`);
+      ctx.logger.error(`❌ Vercel deployment failed: ${errorMessage}`);
       throw error;
     }
   },
 
   async activate(ctx: AdapterContext, input: ActivateInput): Promise<void> {
-    ctx.logger.info('🔄 Activating Vercel Sandbox deployment...');
-
-    try {
-      const config = input.config as VercelSandboxConfig;
-      
-      // For now, just log the activation
-      // In a real implementation, this would start the sandbox
-      ctx.logger.info('✅ Vercel Sandbox activated successfully');
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      ctx.logger.error(`❌ Vercel Sandbox activation failed: ${errorMessage}`);
-      throw error;
-    }
+    // For Vercel, the deployment is already live once uploaded
+    // This is a no-op since Vercel deployments are immediately accessible
+    ctx.logger.info('✅ Vercel deployment is already live');
   },
 
   async rollback(ctx: AdapterContext, input: RollbackInput): Promise<void> {
-    ctx.logger.info('🔄 Rolling back Vercel Sandbox deployment...');
-
-    try {
-      // For now, just log the rollback
-      // In a real implementation, this would stop the sandbox
-      ctx.logger.info('✅ Vercel Sandbox rolled back successfully');
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      ctx.logger.error(`❌ Vercel Sandbox rollback failed: ${errorMessage}`);
-      throw error;
-    }
+    ctx.logger.info('🔄 Rolling back Vercel deployment...');
+    
+    // Vercel doesn't have a traditional rollback API
+    // You would need to promote a different deployment to production
+    // For now, we'll just log that this operation is not supported
+    
+    ctx.logger.warn('⚠️  Vercel rollback requires promoting another deployment via the dashboard');
+    ctx.logger.info('✅ Rollback acknowledgement complete');
   }
 };
 
-// Helper functions
-async function createSandbox(config: VercelSandboxConfig, ctx: AdapterContext) {
-    // This would integrate with the Vercel Sandbox SDK
-    // For now, we'll simulate the API calls
-    
-    ctx.logger.info('📦 Creating Vercel Sandbox...');
-    
-    // Simulate sandbox creation
-    const sandboxId = `sandbox_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const sandboxUrl = `https://${sandboxId}.sandbox.vercel.app`;
-    
-    // In a real implementation, this would call the Vercel Sandbox API
-    // const sandbox = await Sandbox.create({
-    //   teamId: config.teamId,
-    //   projectId: config.projectId,
-    //   token: config.token,
-    //   source: config.source,
-    //   resources: { vcpus: config.vcpus },
-    //   timeout: config.timeout,
-    //   ports: config.ports,
-    //   runtime: config.runtime,
-    // });
+/**
+ * Wait for Vercel deployment to be ready
+ */
+async function waitForDeployment(
+  deploymentId: string,
+  token: string,
+  teamId: string | undefined,
+  ctx: AdapterContext,
+  maxWaitMs: number = 300000 // 5 minutes
+): Promise<string | null> {
+  const startTime = Date.now();
+  const pollInterval = 5000; // 5 seconds
+  
+  const headers: Record<string, string> = {
+    'Authorization': `Bearer ${token}`,
+  };
+  
+  if (teamId) {
+    headers['x-vercel-team-id'] = teamId;
+  }
 
-    return {
-      id: sandboxId,
-      url: sandboxUrl,
-      status: 'created',
-    };
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      const response = await fetch(`https://api.vercel.com/v13/deployments/${deploymentId}`, {
+        headers,
+      });
+
+      if (!response.ok) {
+        ctx.logger.warn(`Failed to check deployment status: ${response.status}`);
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        continue;
+      }
+
+      const deployment = await response.json() as any;
+      
+      if (deployment.readyState === 'READY') {
+        ctx.logger.info('✅ Deployment is ready!');
+        return `https://${deployment.url}`;
+      }
+      
+      if (deployment.readyState === 'ERROR' || deployment.readyState === 'CANCELED') {
+        throw new Error(`Deployment failed with state: ${deployment.readyState}`);
+      }
+      
+      // Still building
+      ctx.logger.info(`⏳ Deployment status: ${deployment.readyState}...`);
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Deployment failed')) {
+        throw error;
+      }
+      // Network error, retry
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+  }
+  
+  // Timeout - deployment might still be building
+  ctx.logger.warn('⚠️  Deployment is still building (timeout reached)');
+  return null;
 }
 
-async function startSandbox(sandboxId: string, config: VercelSandboxConfig, ctx: AdapterContext) {
-    ctx.logger.info(`🚀 Starting sandbox ${sandboxId}...`);
-    
-    // In a real implementation, this would call the Vercel Sandbox API
-    // await sandbox.start();
-    
-    ctx.logger.info('✅ Sandbox started successfully');
-}
+/**
+ * Recursively collect all files from a directory
+ */
+async function collectFiles(
+  dir: string,
+): Promise<Array<{ fullPath: string; relativePath: string }>> {
+  const files: Array<{ fullPath: string; relativePath: string }> = [];
 
-async function stopSandbox(sandboxId: string, ctx: AdapterContext) {
-    ctx.logger.info(`🛑 Stopping sandbox ${sandboxId}...`);
-    
-    // In a real implementation, this would call the Vercel Sandbox API
-    // await sandbox.stop();
-    
-    ctx.logger.info('✅ Sandbox stopped successfully');
-}
+  async function scan(currentPath: string, basePath: string) {
+    const entries = await readdir(currentPath, { withFileTypes: true });
 
-async function deleteSandbox(sandboxId: string, ctx: AdapterContext) {
-    ctx.logger.info(`🗑️ Deleting sandbox ${sandboxId}...`);
-    
-    // In a real implementation, this would call the Vercel Sandbox API
-    // await sandbox.delete();
-    
-    ctx.logger.info('✅ Sandbox deleted successfully');
+    for (const entry of entries) {
+      const fullPath = join(currentPath, entry.name);
+
+      // Skip hidden files and directories (except .well-known)
+      if (entry.name.startsWith('.') && entry.name !== '.well-known') {
+        continue;
+      }
+
+      // Skip node_modules
+      if (entry.name === 'node_modules') {
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        await scan(fullPath, basePath);
+      } else if (entry.isFile()) {
+        const relativePath = relative(basePath, fullPath).replace(/\\/g, '/');
+        files.push({ fullPath, relativePath });
+      }
+    }
+  }
+
+  await scan(dir, dir);
+  return files;
 }

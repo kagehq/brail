@@ -571,6 +571,12 @@ watch([deploySearchQuery, deployFilterValue], () => {
 });
 
 const publicUrl = computed(() => {
+  // Check if the active deploy has a preview URL from an external adapter
+  const activeDeploy = deploys.value.find(d => d.id === site.value?.activeDeployId);
+  if (activeDeploy?.previewUrl) {
+    return activeDeploy.previewUrl;
+  }
+  // Otherwise use the Brail hosting URL
   return `${config.public.apiUrl}/public/${siteId}/`;
 });
 

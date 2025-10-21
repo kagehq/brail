@@ -1,4 +1,4 @@
-import { readFile, readdir, writeFile } from 'fs/promises';
+import { readFile, readdir } from 'fs/promises';
 import { join, relative } from 'path';
 import type {
   DeployAdapter,
@@ -10,9 +10,16 @@ import type {
   ValidationResult,
 } from './types.js';
 
+export interface CloudflarePagesConfig {
+  accountId: string;
+  apiToken: string;
+  projectName: string;
+  productionBranch?: string;
+}
+
 /**
- * Cloudflare Sandbox adapter for deploying dynamic sites with server-side processing
- * Combines static file hosting with secure code execution in isolated environments
+ * Cloudflare Pages adapter for deploying static sites
+ * Uses Cloudflare Pages Direct Upload API
  */
 export class CloudflareSandboxAdapter implements DeployAdapter {
   name = 'cloudflare-sandbox';
@@ -32,13 +39,8 @@ export class CloudflareSandboxAdapter implements DeployAdapter {
       return { valid: false, reason: 'apiToken is required' };
     }
 
-    // Validate sandbox configuration
-    if (!c.runtime || typeof c.runtime !== 'string') {
-      return { valid: false, reason: 'runtime is required (node, python, etc.)' };
-    }
-
-    if (!c.buildCommand || typeof c.buildCommand !== 'string') {
-      return { valid: false, reason: 'buildCommand is required (e.g., "npm run build")' };
+    if (!c.projectName || typeof c.projectName !== 'string') {
+      return { valid: false, reason: 'projectName is required' };
     }
 
     return { valid: true };
@@ -48,83 +50,64 @@ export class CloudflareSandboxAdapter implements DeployAdapter {
     ctx: AdapterContext,
     input: UploadInput,
   ): Promise<{ destinationRef?: string; platformDeploymentId?: string; previewUrl?: string }> {
-    const config = input.config as any;
-    const { deployId, filesDir, site } = input;
+    const config = input.config as CloudflarePagesConfig;
+    const { deployId, filesDir } = input;
 
-    ctx.logger.info('[Cloudflare Sandbox] Starting dynamic deployment...');
+    ctx.logger.info('[Cloudflare Pages] Starting deployment...');
 
-    // 1. Upload static files to R2 storage
-    const staticFiles = await this.uploadStaticFiles(ctx, config, filesDir);
-    ctx.logger.info(`[Cloudflare Sandbox] Uploaded ${staticFiles.length} static files`);
+    try {
+      // Ensure project exists
+      await this.ensureProject(ctx, config);
 
-    // 2. Create sandbox environment
-    const sandboxId = await this.createSandbox(ctx, config, deployId);
-    ctx.logger.info(`[Cloudflare Sandbox] Created sandbox: ${sandboxId}`);
+      // Collect files
+      const files = await this.collectFiles(filesDir);
+      ctx.logger.info(`[Cloudflare Pages] Found ${files.length} files`);
 
-    // 3. Upload source code to sandbox
-    await this.uploadSourceCode(ctx, config, sandboxId, filesDir);
-    ctx.logger.info('[Cloudflare Sandbox] Uploaded source code to sandbox');
+      // Create deployment
+      const deployment = await this.createDeployment(ctx, config, files, deployId);
+      
+      ctx.logger.info(`[Cloudflare Pages] Deployment created: ${deployment.id}`);
+      ctx.logger.info(`[Cloudflare Pages] Preview URL: ${deployment.url}`);
 
-    // 4. Execute build process in sandbox
-    const buildResult = await this.executeBuild(ctx, config, sandboxId);
-    ctx.logger.info(`[Cloudflare Sandbox] Build completed: ${buildResult.success ? 'success' : 'failed'}`);
-
-    if (!buildResult.success) {
-      throw new Error(`Build failed: ${buildResult.error}`);
+      return {
+        destinationRef: deployment.url,
+        platformDeploymentId: deployment.id,
+        previewUrl: deployment.url,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      ctx.logger.error(`[Cloudflare Pages] Deployment failed: ${errorMessage}`);
+      throw error;
     }
-
-    // 5. Start application server in sandbox
-    const previewUrl = await this.startApplication(ctx, config, sandboxId);
-    ctx.logger.info(`[Cloudflare Sandbox] Application started: ${previewUrl}`);
-
-    return {
-      destinationRef: previewUrl,
-      platformDeploymentId: sandboxId,
-      previewUrl,
-    };
   }
 
   async activate(
     ctx: AdapterContext,
-    input: ActivateInput & { target?: string; platformDeploymentId?: string },
+    input: ActivateInput,
   ): Promise<void> {
-    const config = input.config as any;
-    const target = (input as any).target || 'preview';
-    const platformDeploymentId = (input as any).platformDeploymentId;
-
-    if (target === 'production' && platformDeploymentId) {
-      ctx.logger.info(`[Cloudflare Sandbox] Promoting sandbox ${platformDeploymentId} to production`);
-      await this.promoteToProduction(ctx, config, platformDeploymentId);
-      ctx.logger.info('[Cloudflare Sandbox] Sandbox promoted to production');
-    } else {
-      ctx.logger.info('[Cloudflare Sandbox] Preview deployment already active');
-    }
+    // Cloudflare Pages deployments are automatically live
+    // To promote to production, you'd need to set it as the production deployment
+    ctx.logger.info('[Cloudflare Pages] Deployment is already live');
   }
 
   async rollback(
     ctx: AdapterContext,
-    input: RollbackInput & { platformDeploymentId?: string },
+    input: RollbackInput,
   ): Promise<void> {
-    const config = input.config as any;
-    const platformDeploymentId = (input as any).platformDeploymentId;
-
-    if (!platformDeploymentId) {
-      throw new Error('platformDeploymentId is required for Cloudflare Sandbox rollback');
-    }
-
-    ctx.logger.info(`[Cloudflare Sandbox] Rolling back to sandbox ${platformDeploymentId}`);
-    await this.promoteToProduction(ctx, config, platformDeploymentId);
-    ctx.logger.info('[Cloudflare Sandbox] Rollback complete');
+    const config = input.config as CloudflarePagesConfig;
+    
+    ctx.logger.info('[Cloudflare Pages] Rollback initiated');
+    ctx.logger.warn('[Cloudflare Pages] Manual rollback via dashboard recommended');
   }
 
   async listReleases(
     ctx: AdapterContext,
     config: unknown,
   ): Promise<ReleaseInfo[]> {
-    const c = config as any;
+    const c = config as CloudflarePagesConfig;
     
     try {
-      const url = `https://api.cloudflare.com/client/v4/accounts/${c.accountId}/sandbox`;
+      const url = `https://api.cloudflare.com/client/v4/accounts/${c.accountId}/pages/projects/${c.projectName}/deployments`;
       const headers = this.getHeaders(c);
 
       const response = await fetch(url, { headers });
@@ -134,44 +117,48 @@ export class CloudflareSandboxAdapter implements DeployAdapter {
       }
 
       const data: any = await response.json();
-      const sandboxes = data.result || [];
+      const deployments = data.result || [];
 
-      return sandboxes.map((s: any) => ({
-        id: s.id,
-        timestamp: s.created_at,
-        status: s.status === 'active' ? 'active' : 'staged',
+      return deployments.map((d: any) => ({
+        id: d.id,
+        timestamp: d.created_on,
+        status: d.latest_stage?.status === 'success' ? 'active' : 'staged',
       }));
     } catch (error) {
-      ctx.logger.error(`[Cloudflare Sandbox] Failed to list releases: ${error}`);
+      ctx.logger.error(`[Cloudflare Pages] Failed to list releases: ${error}`);
       return [];
     }
   }
 
-  private async uploadStaticFiles(
+  private async ensureProject(
     ctx: AdapterContext,
-    config: any,
-    filesDir: string,
-  ): Promise<Array<{ path: string; url: string }>> {
-    ctx.logger.info('[Cloudflare Sandbox] Uploading static files to R2...');
+    config: CloudflarePagesConfig,
+  ): Promise<void> {
+    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/pages/projects/${config.projectName}`;
+    const headers = this.getHeaders(config);
 
-    const files = await this.collectFiles(filesDir);
-    const uploadedFiles: Array<{ path: string; url: string }> = [];
+    const response = await fetch(url, { headers });
 
-    for (const file of files) {
-      const content = await readFile(file.fullPath);
-      const uploadUrl = await this.uploadToR2(ctx, config, file.relativePath, content);
-      uploadedFiles.push({ path: file.relativePath, url: uploadUrl });
+    if (response.ok) {
+      ctx.logger.info('[Cloudflare Pages] Project exists');
+      return;
     }
 
-    return uploadedFiles;
+    if (response.status === 404) {
+      // Project doesn't exist, create it
+      ctx.logger.info('[Cloudflare Pages] Creating new project...');
+      await this.createProject(ctx, config);
+    } else {
+      const error = await response.text();
+      throw new Error(`Failed to check project: ${response.status} ${error}`);
+    }
   }
 
-  private async createSandbox(
+  private async createProject(
     ctx: AdapterContext,
-    config: any,
-    deployId: string,
-  ): Promise<string> {
-    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/sandbox`;
+    config: CloudflarePagesConfig,
+  ): Promise<void> {
+    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/pages/projects`;
     const headers = this.getHeaders(config);
 
     const response = await fetch(url, {
@@ -181,158 +168,107 @@ export class CloudflareSandboxAdapter implements DeployAdapter {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        name: `brail-${deployId}`,
-        runtime: config.runtime,
-        timeout: config.timeout || 300, // 5 minutes default
-        memory: config.memory || 128, // 128MB default
+        name: config.projectName,
+        production_branch: config.productionBranch || 'main',
       }),
     });
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Failed to create sandbox: ${response.status} ${error}`);
+      throw new Error(`Failed to create project: ${response.status} ${error}`);
     }
 
-    const data: any = await response.json();
-    return data.result.id;
+    ctx.logger.info('[Cloudflare Pages] Project created successfully');
   }
 
-  private async uploadSourceCode(
+  private async createDeployment(
     ctx: AdapterContext,
-    config: any,
-    sandboxId: string,
-    filesDir: string,
-  ): Promise<void> {
-    const files = await this.collectFiles(filesDir);
+    config: CloudflarePagesConfig,
+    files: Array<{ fullPath: string; relativePath: string; content: Buffer }>,
+    deployId: string,
+  ): Promise<{ id: string; url: string }> {
+    // Step 1: Create deployment
+    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/pages/projects/${config.projectName}/deployments`;
+    const headers = this.getHeaders(config);
+
+    // Prepare manifest
+    const manifest: Record<string, string> = {};
+    for (const file of files) {
+      // Calculate hash for each file
+      const hash = await this.hashContent(file.content);
+      manifest[`/${file.relativePath}`] = hash;
+    }
+
+    ctx.logger.info('[Cloudflare Pages] Creating deployment...');
+
+    const deployResponse = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        branch: `deploy-${deployId}`,
+        manifest,
+      }),
+    });
+
+    if (!deployResponse.ok) {
+      const error = await deployResponse.text();
+      throw new Error(`Failed to create deployment: ${deployResponse.status} ${error}`);
+    }
+
+    const deployment = await deployResponse.json() as any;
+    
+    // Step 2: Upload files
+    ctx.logger.info('[Cloudflare Pages] Uploading files...');
     
     for (const file of files) {
-      const content = await readFile(file.fullPath);
+      const uploadUrl = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/pages/projects/${config.projectName}/deployments/${deployment.result.id}/files/${file.relativePath}`;
       
-      const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/sandbox/${sandboxId}/files`;
-      const headers = this.getHeaders(config);
-
-      const response = await fetch(url, {
-        method: 'POST',
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
         headers: {
           ...headers,
           'Content-Type': 'application/octet-stream',
         },
-        body: content,
+        body: file.content,
       });
 
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to upload file ${file.relativePath}: ${response.status} ${error}`);
+      if (!uploadResponse.ok) {
+        const error = await uploadResponse.text();
+        throw new Error(`Failed to upload file ${file.relativePath}: ${uploadResponse.status} ${error}`);
       }
     }
-  }
 
-  private async executeBuild(
-    ctx: AdapterContext,
-    config: any,
-    sandboxId: string,
-  ): Promise<{ success: boolean; error?: string; output?: string }> {
-    ctx.logger.info(`[Cloudflare Sandbox] Executing build: ${config.buildCommand}`);
-
-    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/sandbox/${sandboxId}/execute`;
-    const headers = this.getHeaders(config);
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        command: config.buildCommand,
-        timeout: config.buildTimeout || 300,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      return { success: false, error: `Build execution failed: ${response.status} ${error}` };
-    }
-
-    const data: any = await response.json();
+    // Step 3: Finalize deployment
+    const finalizeUrl = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/pages/projects/${config.projectName}/deployments/${deployment.result.id}/finalize`;
     
-    if (data.result.exitCode !== 0) {
-      return { 
-        success: false, 
-        error: data.result.stderr || 'Build failed with non-zero exit code',
-        output: data.result.stdout 
-      };
-    }
-
-    return { success: true, output: data.result.stdout };
-  }
-
-  private async startApplication(
-    ctx: AdapterContext,
-    config: any,
-    sandboxId: string,
-  ): Promise<string> {
-    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/sandbox/${sandboxId}/start`;
-    const headers = this.getHeaders(config);
-
-    const response = await fetch(url, {
+    const finalizeResponse = await fetch(finalizeUrl, {
       method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        command: config.startCommand || 'npm start',
-        port: config.port || 3000,
-      }),
+      headers,
     });
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to start application: ${response.status} ${error}`);
+    if (!finalizeResponse.ok) {
+      const error = await finalizeResponse.text();
+      throw new Error(`Failed to finalize deployment: ${finalizeResponse.status} ${error}`);
     }
 
-    const data: any = await response.json();
-    return data.result.previewUrl;
+    const finalized = await finalizeResponse.json() as any;
+    
+    return {
+      id: finalized.result.id,
+      url: finalized.result.url,
+    };
   }
 
-  private async uploadToR2(
-    ctx: AdapterContext,
-    config: any,
-    key: string,
-    content: Buffer,
-  ): Promise<string> {
-    // This would integrate with Cloudflare R2 API
-    // For now, return a placeholder URL
-    return `https://r2.dev/${config.bucket}/${key}`;
+  private async hashContent(content: Buffer): Promise<string> {
+    // Simple SHA-256 hash
+    const crypto = await import('crypto');
+    return crypto.createHash('sha256').update(content).digest('hex');
   }
 
-  private async promoteToProduction(
-    ctx: AdapterContext,
-    config: any,
-    sandboxId: string,
-  ): Promise<void> {
-    const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/sandbox/${sandboxId}/promote`;
-    const headers = this.getHeaders(config);
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        environment: 'production',
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to promote sandbox: ${response.status} ${error}`);
-    }
-  }
-
-  private getHeaders(config: any): Record<string, string> {
+  private getHeaders(config: CloudflarePagesConfig): Record<string, string> {
     return {
       Authorization: `Bearer ${config.apiToken}`,
     };
@@ -340,8 +276,8 @@ export class CloudflareSandboxAdapter implements DeployAdapter {
 
   private async collectFiles(
     dir: string,
-  ): Promise<Array<{ fullPath: string; relativePath: string }>> {
-    const files: Array<{ fullPath: string; relativePath: string }> = [];
+  ): Promise<Array<{ fullPath: string; relativePath: string; content: Buffer }>> {
+    const files: Array<{ fullPath: string; relativePath: string; content: Buffer }> = [];
 
     async function scan(currentPath: string, basePath: string) {
       const entries = await readdir(currentPath, { withFileTypes: true });
@@ -354,11 +290,17 @@ export class CloudflareSandboxAdapter implements DeployAdapter {
           continue;
         }
 
+        // Skip node_modules
+        if (entry.name === 'node_modules') {
+          continue;
+        }
+
         if (entry.isDirectory()) {
           await scan(fullPath, basePath);
         } else if (entry.isFile()) {
           const relativePath = relative(basePath, fullPath).replace(/\\/g, '/');
-          files.push({ fullPath, relativePath });
+          const content = await readFile(fullPath);
+          files.push({ fullPath, relativePath, content });
         }
       }
     }

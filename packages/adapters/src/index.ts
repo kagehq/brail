@@ -67,3 +67,6 @@ adapterRegistry.register(new RenderAdapter());
 // Phase 4 adapters - Dynamic/Server-side processing
 adapterRegistry.register(new CloudflareSandboxAdapter());
 adapterRegistry.register(vercelSandboxAdapter);
+
+// Export discovery utilities
+export * from './discovery.js';
