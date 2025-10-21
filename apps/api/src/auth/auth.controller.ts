@@ -55,13 +55,20 @@ export class AuthController {
       );
 
       // Set cookie
-      // In dev, set domain to 'localhost' to work across ports
       const isProduction = process.env.NODE_ENV === 'production';
+      
+      // In production, set domain to parent domain to work across subdomains
+      // (e.g., .brailhq.com works for both api.brailhq.com and app.brailhq.com)
+      const cookieDomain = isProduction 
+        ? `.${process.env.PUBLIC_HOST?.replace(/^api\./, '') || 'brailhq.com'}`
+        : 'localhost';
+      
       res.cookie('br_session', sessionToken, {
-        httpOnly: false, // Disabled for dev to work cross-port
+        httpOnly: false,
+        secure: isProduction, // HTTPS only in production
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         sameSite: 'lax',
-        domain: 'localhost', // Allow cookie across localhost ports
+        domain: cookieDomain,
         path: '/',
       });
 
