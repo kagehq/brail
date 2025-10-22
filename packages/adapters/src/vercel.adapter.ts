@@ -1,4 +1,4 @@
-import { readFile, readdir, writeFile } from 'fs/promises';
+import { readFile, readdir, writeFile, access } from 'fs/promises';
 import { join, relative } from 'path';
 import type {
   DeployAdapter,
@@ -81,7 +81,7 @@ export class VercelAdapter implements DeployAdapter {
     // Ensure project exists (or create it)
     let projectId = config.projectId;
     if (!projectId) {
-      projectId = await this.ensureProject(ctx, config, projectName);
+      projectId = await this.ensureProject(ctx, config, projectName, filesDir);
     }
 
     // Create deployment
@@ -171,10 +171,93 @@ export class VercelAdapter implements DeployAdapter {
     }
   }
 
+  /**
+   * Auto-detect framework from deployed files
+   */
+  private async detectFrameworkFromFiles(filesDir: string): Promise<string> {
+    try {
+      // Check for package.json
+      const packageJsonPath = join(filesDir, 'package.json');
+      const packageJsonExists = await this.fileExists(packageJsonPath);
+
+      if (packageJsonExists) {
+        const content = await readFile(packageJsonPath, 'utf-8');
+        const pkg = JSON.parse(content);
+        const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+
+        // Detect framework from dependencies
+        if (deps['next']) return 'next';
+        if (deps['nuxt']) return 'nuxt';
+        if (deps['@sveltejs/kit']) return 'sveltekit';
+        if (deps['astro']) return 'astro';
+        if (deps['vite']) return 'vite';
+        if (deps['vue']) return 'vue';
+        if (deps['react'] || deps['react-dom']) return 'react';
+      }
+
+      // Check for framework-specific config files
+      if (await this.fileExists(join(filesDir, 'next.config.js')) ||
+          await this.fileExists(join(filesDir, 'next.config.mjs')) ||
+          await this.fileExists(join(filesDir, 'next.config.ts'))) {
+        return 'next';
+      }
+
+      if (await this.fileExists(join(filesDir, 'nuxt.config.ts')) ||
+          await this.fileExists(join(filesDir, 'nuxt.config.js'))) {
+        return 'nuxt';
+      }
+
+      if (await this.fileExists(join(filesDir, 'astro.config.mjs'))) {
+        return 'astro';
+      }
+
+      if (await this.fileExists(join(filesDir, 'svelte.config.js'))) {
+        return 'sveltekit';
+      }
+
+      // Default to static
+      return 'static';
+    } catch (error) {
+      return 'static';
+    }
+  }
+
+  /**
+   * Check if a file exists
+   */
+  private async fileExists(path: string): Promise<boolean> {
+    try {
+      await access(path);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Map Brail framework names to Vercel framework slugs
+   */
+  private mapFrameworkToVercel(framework?: string): string | null {
+    const frameworkMap: Record<string, string | null> = {
+      'next': 'nextjs',
+      'nuxt': 'nuxtjs',
+      'sveltekit': 'sveltekit',
+      'astro': 'astro',
+      'vite': 'vite',
+      'react': 'create-react-app',
+      'vue': 'vue',
+      'tanstack': null, // No direct equivalent - use "Other" preset
+      'static': null,   // Use "Other" preset for static sites
+    };
+
+    return frameworkMap[framework || 'static'] ?? null;
+  }
+
   private async ensureProject(
     ctx: AdapterContext,
     config: any,
     projectName: string,
+    filesDir: string,
   ): Promise<string> {
     ctx.logger.info(`[Vercel] Ensuring project exists: ${projectName}`);
 
@@ -194,13 +277,24 @@ export class VercelAdapter implements DeployAdapter {
       // Project doesn't exist, will create it
     }
 
+    // Auto-detect framework if not specified in config
+    let frameworkPreset: string | null;
+    if (config.framework) {
+      frameworkPreset = this.mapFrameworkToVercel(config.framework);
+      ctx.logger.info(`[Vercel] Using configured framework: ${config.framework} -> ${frameworkPreset || 'Other'}`);
+    } else {
+      const detectedFramework = await this.detectFrameworkFromFiles(filesDir);
+      frameworkPreset = this.mapFrameworkToVercel(detectedFramework);
+      ctx.logger.info(`[Vercel] Auto-detected framework: ${detectedFramework} -> ${frameworkPreset || 'Other'}`);
+    }
+
     // Create new project
     ctx.logger.info(`[Vercel] Creating new project: ${projectName}`);
     const createUrl = 'https://api.vercel.com/v9/projects';
 
     const body: any = {
       name: projectName,
-      framework: config.framework || 'static',
+      framework: frameworkPreset,
     };
 
     if (config.teamId) {
