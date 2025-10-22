@@ -47,7 +47,7 @@ export class AuthController {
   ): Promise<void> {
     try {
       // Verify token and get/create user
-      const user = await this.authService.verifyMagicToken(token);
+      const user = await this.authService.processVerifiedToken(token);
 
       // Create session token
       const sessionToken = await this.authService.generateSessionToken(

@@ -24,11 +24,30 @@ export class AuthService {
    * Verify magic token and get/create user
    */
   async verifyMagicToken(token: string) {
-    const payload = this.jwtService.verify(token);
+    try {
+      const payload = this.jwtService.verify(token);
 
-    if (payload.type !== 'magic') {
-      throw new Error('Invalid token type');
+      if (payload.type !== 'magic') {
+        throw new Error('Invalid token type');
+      }
+
+      return payload;
+    } catch (error) {
+      // Re-throw with consistent error for controller to handle
+      if (error.name === 'TokenExpiredError') {
+        throw new Error('jwt expired');
+      } else if (error.name === 'JsonWebTokenError') {
+        throw new Error('invalid signature');
+      }
+      throw error;
     }
+  }
+
+  /**
+   * Process verified magic token - get or create user
+   */
+  async processVerifiedToken(token: string) {
+    const payload = await this.verifyMagicToken(token);
 
     // Get or create user
     let user = await this.prisma.user.findUnique({
