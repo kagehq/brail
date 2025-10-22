@@ -123,8 +123,15 @@ export class AuthController {
    */
   @Post('logout')
   async logout(@Res() res: Response): Promise<void> {
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    // Must match the domain used when setting the cookie
+    const cookieDomain = isProduction 
+      ? `.${process.env.PUBLIC_HOST?.replace(/^api\./, '') || 'brailhq.com'}`
+      : 'localhost';
+    
     res.clearCookie('br_session', {
-      domain: 'localhost',
+      domain: cookieDomain,
       path: '/',
     });
 
