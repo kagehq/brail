@@ -209,6 +209,23 @@ br watch --site my-site --root ./dist --auto
 
 Or use the **Files** tab in the web interface.
 
+## Development Tools
+
+### FlowScope Integration (Optional)
+
+Debug API traffic with [FlowScope](https://github.com/kagehq/flowscope) - a visual HTTP request/response viewer:
+
+```bash
+# 1. Install FlowScope (one-time)
+git clone https://github.com/kagehq/flowscope.git
+cd flowscope && docker-compose up -d
+
+# 2. Enable in Brail
+echo "FLOWSCOPE_ENABLED=true" > apps/web/.env
+
+# 3. View requests at http://localhost:4320
+```
+
 ## Documentation
 
 - **Quick Start:** You're reading it!
@@ -216,7 +233,6 @@ Or use the **Files** tab in the web interface.
 - **SDK Guide:** [packages/sdk/README.md](./packages/sdk/README.md)
 - **Adapter Development:** [docs/ADAPTER_SDK.md](./docs/ADAPTER_SDK.md)
 - **Templates:** [templates/README.md](./templates/README.md)
-- **Audit Report:** [AUDIT_REPORT.md](./AUDIT_REPORT.md)
 
 ## Contributing
 
