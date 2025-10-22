@@ -66,7 +66,7 @@ export class AuthController {
       res.cookie('br_session', sessionToken, {
         httpOnly: false,
         secure: isProduction, // HTTPS only in production
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         sameSite: 'lax',
         domain: cookieDomain,
         path: '/',
@@ -77,11 +77,16 @@ export class AuthController {
       res.redirect(`${webUrl}/sites`);
     } catch (error) {
       console.error('Magic link callback error:', error);
-      res.status(HttpStatus.UNAUTHORIZED).json({
-        statusCode: HttpStatus.UNAUTHORIZED,
-        message: 'Invalid or expired token',
-        error: error.message,
-      });
+      
+      // Redirect to login page with error message instead of returning JSON
+      const webUrl = process.env.WEB_URL || 'http://localhost:3001';
+      const errorMessage = encodeURIComponent(
+        error.message === 'jwt expired' 
+          ? 'This magic link has expired. Please request a new one.'
+          : 'This magic link is invalid or has already been used. Please request a new one.'
+      );
+      
+      res.redirect(`${webUrl}/login?error=${errorMessage}`);
     }
   }
 

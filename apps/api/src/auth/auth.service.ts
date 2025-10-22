@@ -68,7 +68,11 @@ export class AuthService {
    * Generate session token
    */
   async generateSessionToken(userId: string): Promise<string> {
-    return this.jwtService.sign({ userId, type: 'session' });
+    // Session tokens last 30 days (much longer than cookie for flexibility)
+    return this.jwtService.sign(
+      { userId, type: 'session' },
+      { expiresIn: '30d' }
+    );
   }
 
   /**

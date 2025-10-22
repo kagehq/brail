@@ -122,6 +122,7 @@
 <script setup lang="ts">
 const api = useApi();
 const router = useRouter();
+const route = useRoute();
 
 const email = ref('');
 const loading = ref(false);
@@ -143,8 +144,14 @@ const handleLogin = async () => {
   }
 };
 
-// Auto-redirect if already authenticated
+// Check for error in query params (from failed magic link)
 onMounted(async () => {
+  // Display error from query params if present
+  if (route.query.error) {
+    error.value = decodeURIComponent(route.query.error as string);
+  }
+  
+  // Auto-redirect if already authenticated
   const config = useRuntimeConfig();
   try {
     const response = await fetch(`${config.public.apiUrl}/v1/auth/me`, {
@@ -155,7 +162,7 @@ onMounted(async () => {
       // User is already authenticated, redirect to sites
       router.push('/sites');
     }
-  } catch (error) {
+  } catch (err) {
     // Not authenticated, stay on login page
   }
 });
