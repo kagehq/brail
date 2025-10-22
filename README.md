@@ -4,6 +4,33 @@
 
 **Brail** is like FileZilla for the modern web - push your sites to your own servers, cloud storage, or platforms like Vercel and Cloudflare. Full control, maximum flexibility.
 
+## Why Brail?
+
+Most deployment platforms force you to choose between **simplicity** or **flexibility**:
+
+**Simple but locked-in** (Vercel, Netlify)
+- ✅ Great developer experience
+- ❌ Vendor lock-in - can't easily switch
+- ❌ Limited to their infrastructure
+- ❌ Can't deploy to your own servers
+
+**Flexible but complex** (Manual SSH/FTP)
+- ✅ Deploy anywhere you want
+- ❌ No safety guarantees or rollbacks
+- ❌ Manual processes, error-prone
+- ❌ No modern DevOps features
+
+### Brail gives you both
+
+✅ **Deploy anywhere** - Your servers, cloud storage, or any platform  
+✅ **Zero downtime** - Atomic deployments with health checks  
+✅ **Instant rollbacks** - One command to undo any deployment  
+✅ **Live patching** - Update single files in seconds (unique to Brail)  
+✅ **No vendor lock-in** - Switch platforms anytime, same workflow  
+✅ **Three interfaces** - Web dashboard, CLI, or programmatic SDK  
+
+**Start on Vercel, move to Cloudflare, then to your own SSH server** - same commands, same workflow. Your deployment strategy stays flexible as your needs evolve.
+
 ## Features
 
 - **13 Deployment Adapters** - SSH, FTP, S3, Vercel, Cloudflare, Railway, Fly.io, Render, Netlify, GitHub Pages, and more
