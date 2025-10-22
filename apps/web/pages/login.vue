@@ -120,6 +120,8 @@
 </template>
 
 <script setup lang="ts">
+import { z } from 'zod';
+
 const api = useApi();
 const router = useRouter();
 const route = useRoute();
@@ -129,13 +131,23 @@ const loading = ref(false);
 const message = ref('');
 const error = ref('');
 
+const emailSchema = z.string().trim().min(1, 'Email is required').email('Please enter a valid email address');
+
 const handleLogin = async () => {
   loading.value = true;
   message.value = '';
   error.value = '';
-  
+
+  const validation = emailSchema.safeParse(email.value);
+
+  if (!validation.success) {
+    error.value = validation.error.errors[0].message;
+    loading.value = false;
+    return;
+  }
+
   try {
-    const response = await api.requestMagicLink({ email: email.value });
+    const response = await api.requestMagicLink({ email: validation.data });
     message.value = response.message;
   } catch (err: any) {
     error.value = err.message || 'Failed to send magic link';
@@ -150,14 +162,14 @@ onMounted(async () => {
   if (route.query.error) {
     error.value = decodeURIComponent(route.query.error as string);
   }
-  
+
   // Auto-redirect if already authenticated
   const config = useRuntimeConfig();
   try {
     const response = await fetch(`${config.public.apiUrl}/v1/auth/me`, {
       credentials: 'include',
     });
-    
+
     if (response.ok) {
       // User is already authenticated, redirect to sites
       router.push('/sites');
