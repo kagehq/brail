@@ -113,16 +113,28 @@ export async function parseDropJson(filesDir: string): Promise<DropJsonConfig | 
   }
 }
 
-export function toVercelConfig(drop: DropJsonConfig | null): any {
-  if (!drop) {
-    return {};
-  }
-
+export function toVercelConfig(drop: DropJsonConfig | null, includeDefaultRouting = true): any {
   const vercelConfig: any = {};
   const nextParamName = (() => {
     let index = 0;
     return () => `glob${++index}`;
   })();
+
+  if (!drop) {
+    // If no _drop.json config and default routing requested, add SPA fallback
+    if (includeDefaultRouting) {
+      vercelConfig.routes = [
+        {
+          handle: 'filesystem',
+        },
+        {
+          src: '/(.*)',
+          dest: '/index.html',
+        },
+      ];
+    }
+    return vercelConfig;
+  }
 
   if (Array.isArray(drop.redirects) && drop.redirects.length > 0) {
     const redirects: Array<{ source: string; destination: string; permanent: boolean; statusCode: number }> = [];
@@ -172,6 +184,19 @@ export function toVercelConfig(drop: DropJsonConfig | null): any {
     if (headers.length > 0) {
       vercelConfig.headers = headers;
     }
+  }
+
+  // Add default SPA routing if not already configured and requested
+  if (includeDefaultRouting && !vercelConfig.routes && !vercelConfig.rewrites) {
+    vercelConfig.routes = [
+      {
+        handle: 'filesystem',
+      },
+      {
+        src: '/(.*)',
+        dest: '/index.html',
+      },
+    ];
   }
 
   return vercelConfig;
