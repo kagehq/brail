@@ -2,7 +2,7 @@
 export default defineNuxtConfig({
   telemetry: false,
   devtools: { enabled: true },
-  modules: ['@nuxtjs/tailwindcss'],
+  modules: ['@nuxtjs/tailwindcss', 'nuxt-icon'],
   css: ['~/assets/css/main.css'],
   postcss: {
     plugins: {
