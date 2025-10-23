@@ -17,6 +17,7 @@
     "canvas-confetti": "^1.9.3",
     "jszip": "^3.10.1",
     "nuxt": "^3.9.0",
+    "nuxt-icon": "1.0.0-beta.7",
     "shiki": "^3.13.0",
     "socket.io-client": "^4.8.1",
     "tus-js-client": "^3.1.1",
