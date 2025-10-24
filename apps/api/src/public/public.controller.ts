@@ -8,11 +8,10 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { StorageService } from '../storage/storage.service';
-import { getMimeType, matchPath } from '@br/shared';
+import { matchPath } from '@br/shared';
 
 interface CurrentDeploy {
   deployId: string;
-  activatedAt: string;
 }
 
 interface DropConfig {
@@ -40,130 +39,78 @@ export class PublicController {
   constructor(private readonly storage: StorageService) {}
 
   @Get(':siteId/*')
-  async serve(
+  async serveSite(
     @Param('siteId') siteId: string,
+    @Param('0') requestedPath: string,
     @Res() res: Response,
   ): Promise<void> {
     try {
-      // Extract path
-      const fullPath = res.req.path;
-      const pathMatch = fullPath.match(/^\/public\/[^/]+\/(.*)$/);
-      let requestPath = pathMatch ? pathMatch[1] : '';
+      // 1. Get current deploy for site
+      const current = await this.storage
+        .getObjectJSON<CurrentDeploy>(`sites/${siteId}/current.json`)
+        .catch(() => {
+          throw new NotFoundException('Site configuration not found');
+        });
 
-      // Normalize path
-      requestPath = requestPath.replace(/^\/+/, '');
-
-      // Get current deploy for site
-      const currentPath = this.storage.getSiteCurrentPath(siteId);
-      const current = await this.storage.getObjectJSON<CurrentDeploy>(
-        currentPath,
-      );
-
-      if (!current || !current.deployId) {
-        throw new NotFoundException('No active deploy for this site');
+      if (!current?.deployId) {
+        throw new NotFoundException('No active deployment for this site');
       }
 
-      const deployId = current.deployId;
+      const { deployId } = current;
 
-      // Check if this is a patch deploy by looking for manifest
-      let manifest: PatchManifest | null = null;
-      try {
-        const manifestPath = this.storage.getDeployManifestPath(deployId);
-        manifest = await this.storage.getObjectJSON<PatchManifest>(manifestPath);
-      } catch (error) {
-        // Not a patch deploy or no manifest
-      }
+      // 2. Load manifest and dropConfig to determine deployment rules
+      const manifest = await this.storage
+        .getObjectJSON<PatchManifest>(`deployments/${deployId}/_manifest.json`)
+        .catch(() => null);
 
-      // Try to load _drop.json config (check both patch and base if applicable)
-      let dropConfig: DropConfig | null = null;
-      try {
-        const dropPath = this.storage.getDeployPath(deployId, '_drop.json');
-        dropConfig = await this.storage.getObjectJSON<DropConfig>(dropPath);
-      } catch (error) {
-        // Try base deploy if this is a patch
-        if (manifest?.baseDeployId) {
-          try {
-            const baseDropPath = this.storage.getDeployPath(manifest.baseDeployId, '_drop.json');
-            dropConfig = await this.storage.getObjectJSON<DropConfig>(baseDropPath);
-          } catch {
-            // No _drop.json in base either
+      const dropConfig = await this.storage
+        .getObjectJSON<DropConfig>(`deployments/${deployId}/_drop.json`)
+        .catch(() => {
+          // If it's a patch deploy, try the base deploy's config as a fallback
+          if (manifest?.baseDeployId) {
+            return this.storage.getObjectJSON<DropConfig>(
+              `deployments/${manifest.baseDeployId}/_drop.json`,
+            );
           }
-        }
-      }
+          return null;
+        })
+        .catch(() => null);
 
-      // Apply redirects
+      let filePath = requestedPath || '';
+
+      // 3. Apply redirects from _drop.json
       if (dropConfig?.redirects) {
         for (const redirect of dropConfig.redirects) {
-          if (matchPath(redirect.from, `/${requestPath}`)) {
+          if (matchPath(redirect.from, `/${filePath}`)) {
             this.logger.debug(
-              `Redirect: ${requestPath} -> ${redirect.to} (${redirect.status})`,
+              `Redirecting "${filePath}" to "${redirect.to}" for site "${siteId}"`,
             );
-            res.redirect(redirect.status || 301, redirect.to);
-            return;
+            return res.redirect(redirect.status || 301, redirect.to);
           }
         }
       }
 
-      // Default to index.html if path is empty or ends with /
-      if (!requestPath || requestPath.endsWith('/')) {
-        requestPath = `${requestPath}index.html`;
+      // 4. Default to index.html for root or directory requests
+      if (filePath === '' || filePath.endsWith('/')) {
+        filePath = `${filePath}index.html`;
       }
 
-      // Normalize to leading slash for manifest checks
-      const normalizedPath = requestPath.startsWith('/') ? requestPath : `/${requestPath}`;
-
-      // If manifest exists, check for deletes and overrides
+      // 5. Determine the actual deployment to serve from (patch vs. base)
       let actualDeployId = deployId;
-      
       if (manifest) {
-        // Check if path is deleted
+        const normalizedPath = `/${filePath}`;
         if (manifest.deletes.includes(normalizedPath)) {
-          throw new NotFoundException('File was deleted in this patch');
+          throw new NotFoundException('File deleted in this deployment patch');
         }
-
-        // Check if path is overridden in patch
-        if (manifest.overrides.includes(normalizedPath)) {
-          actualDeployId = deployId; // Use patch deploy
-        } else {
-          actualDeployId = manifest.baseDeployId; // Fallback to base
+        if (!manifest.overrides.includes(normalizedPath)) {
+          actualDeployId = manifest.baseDeployId;
         }
       }
 
-      // Get file from storage
-      let filePath = this.storage.getDeployPath(actualDeployId, requestPath);
-
-      // Check if file exists
-      let exists = await this.storage.exists(filePath);
-      
-      if (!exists) {
-        // Try adding .html extension (for clean URLs)
-        const htmlPath = this.storage.getDeployPath(
-          actualDeployId,
-          `${requestPath}.html`,
-        );
-        const htmlExists = await this.storage.exists(htmlPath);
-
-        if (!htmlExists) {
-          throw new NotFoundException('File not found');
-        }
-
-        // Use the .html version
-        requestPath = `${requestPath}.html`;
-        filePath = htmlPath;
-      }
-
-      // Get file metadata and stream
-      const fileKey = this.storage.getDeployPath(actualDeployId, requestPath);
-      const metadata = await this.storage.headObject(fileKey);
-      const stream = await this.storage.getObjectStream(fileKey);
-
-      // Determine content type - always use file extension to avoid wrong S3 metadata
-      const contentType = getMimeType(requestPath);
-
-      // Apply custom headers from _drop.json
+      // 6. Apply custom headers from _drop.json
       if (dropConfig?.headers) {
         for (const headerRule of dropConfig.headers) {
-          if (matchPath(headerRule.path, `/${requestPath}`)) {
+          if (matchPath(headerRule.path, `/${filePath}`)) {
             for (const [key, value] of Object.entries(headerRule.set)) {
               res.setHeader(key, value);
             }
@@ -171,28 +118,46 @@ export class PublicController {
         }
       }
 
-      // Set response headers
+      // 7. Get file stream, handling clean URL (.html) fallbacks
+      let fileData;
+      try {
+        fileData = await this.storage.getFileStream(actualDeployId, filePath);
+      } catch (error) {
+        if (error instanceof NotFoundException && !filePath.endsWith('.html')) {
+          try {
+            fileData = await this.storage.getFileStream(
+              actualDeployId,
+              `${filePath}.html`,
+            );
+          } catch (htmlError) {
+            throw new NotFoundException('File not found');
+          }
+        } else {
+          throw error;
+        }
+      }
+
+      const { stream, contentType } = fileData;
+
+      // 8. Set final headers and stream response
       res.setHeader('Content-Type', contentType);
-      if (metadata.contentLength) {
-        res.setHeader('Content-Length', metadata.contentLength);
-      }
-      if (metadata.etag) {
-        res.setHeader('ETag', metadata.etag);
+      if (!res.getHeader('Cache-Control')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       }
 
-      // Set cache headers (immutable for deploys)
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-
-      // Stream file
       stream.pipe(res);
     } catch (error) {
       if (error instanceof NotFoundException) {
+        this.logger.debug(
+          `Not found for site "${siteId}" path "${requestedPath}": ${error.message}`,
+        );
         throw error;
       }
-
-      this.logger.error(`Error serving ${siteId}: ${error.message}`);
-      throw new NotFoundException('File not found');
+      this.logger.error(
+        `Error serving path "${requestedPath}" for site "${siteId}": ${error.message}`,
+        error.stack,
+      );
+      throw new NotFoundException('Deployment or file not found');
     }
   }
 }
-
