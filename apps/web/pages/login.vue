@@ -77,8 +77,26 @@
             </div>
           </div>
 
+          <!-- Rate Limit Warning -->
+          <div v-if="rateLimited" class="mt-6 p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl animate-fade-in">
+            <div class="flex items-start gap-3">
+              <div class="flex-shrink-0 w-6 h-6 bg-orange-500/20 rounded-full flex items-center justify-center">
+                <svg class="w-4 h-4 text-orange-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-orange-400">Too many requests</p>
+                <p class="text-sm text-orange-400/80 mt-1">{{ rateLimitMessage }}</p>
+                <p v-if="retryAfter > 0" class="text-xs text-orange-400/60 mt-2">
+                  Try again in {{ retryAfter }} seconds
+                </p>
+              </div>
+            </div>
+          </div>
+
           <!-- Error Message -->
-          <div v-if="error" class="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl animate-fade-in">
+          <div v-if="error && !rateLimited" class="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl animate-fade-in">
             <div class="flex items-start gap-3">
               <div class="flex-shrink-0 w-6 h-6 bg-red-500/20 rounded-full flex items-center justify-center">
                 <svg class="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 20 20">
@@ -130,13 +148,40 @@ const email = ref('');
 const loading = ref(false);
 const message = ref('');
 const error = ref('');
+const rateLimited = ref(false);
+const rateLimitMessage = ref('');
+const retryAfter = ref(0);
+
+let countdownInterval: NodeJS.Timeout | null = null;
 
 const emailSchema = z.string().trim().min(1, 'Email is required').email('Please enter a valid email address');
+
+const startCountdown = (seconds: number) => {
+  retryAfter.value = seconds;
+  
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+  }
+  
+  countdownInterval = setInterval(() => {
+    retryAfter.value--;
+    
+    if (retryAfter.value <= 0) {
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+      }
+      rateLimited.value = false;
+      rateLimitMessage.value = '';
+    }
+  }, 1000);
+};
 
 const handleLogin = async () => {
   loading.value = true;
   message.value = '';
   error.value = '';
+  rateLimited.value = false;
+  rateLimitMessage.value = '';
 
   const validation = emailSchema.safeParse(email.value);
 
@@ -150,7 +195,17 @@ const handleLogin = async () => {
     const response = await api.requestMagicLink({ email: validation.data });
     message.value = response.message;
   } catch (err: any) {
-    error.value = err.message || 'Failed to send magic link';
+    // Handle 429 rate limit errors
+    if (err.statusCode === 429 || err.message?.includes('Too many')) {
+      rateLimited.value = true;
+      rateLimitMessage.value = err.message || 'Too many magic link requests. Please try again later.';
+      
+      // Extract retry-after from error if available (in seconds)
+      const retrySeconds = err.retryAfter || 900; // Default to 15 minutes
+      startCountdown(retrySeconds);
+    } else {
+      error.value = err.message || 'Failed to send magic link';
+    }
   } finally {
     loading.value = false;
   }
@@ -176,6 +231,12 @@ onMounted(async () => {
     }
   } catch (err) {
     // Not authenticated, stay on login page
+  }
+});
+
+onUnmounted(() => {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
   }
 });
 </script>

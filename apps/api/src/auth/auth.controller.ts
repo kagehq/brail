@@ -6,10 +6,13 @@ import {
   Query,
   Res,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { EmailService } from './email.service';
+import { EmailThrottlerGuard } from './email-throttler.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -20,8 +23,11 @@ export class AuthController {
 
   /**
    * Request a magic link
+   * Rate limited: 3 requests per 15 minutes per email address
    */
   @Post('magic')
+  @UseGuards(EmailThrottlerGuard)
+  @Throttle({ default: { limit: 3, ttl: 900000 } }) // 3 requests per 15 minutes (900000ms)
   async requestMagicLink(@Body() body: { email: string }) {
     const { email } = body;
 
