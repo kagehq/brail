@@ -8,23 +8,25 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "require": "./dist/index.cjs"
     },
-    "./audit": {
+    "./src/audit.js": {
       "types": "./dist/audit.d.ts",
       "import": "./dist/audit.js",
-      "require": "./dist/audit.js"
+      "require": "./dist/audit.cjs"
     },
-    "./crypto": {
+    "./src/crypto.js": {
       "types": "./dist/crypto.d.ts",
       "import": "./dist/crypto.js",
-      "require": "./dist/crypto.js"
+      "require": "./dist/crypto.cjs"
     }
   },
   "scripts": {
-    "build": "tsc --outDir dist",
+    "build": "npm run build:esm && npm run build:cjs",
+    "build:esm": "tsc",
+    "build:cjs": "tsc --module commonjs --outDir dist-cjs && node scripts/fix-cjs.cjs && rm -rf dist-cjs",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist dist-cjs"
   },
   "dependencies": {
     "zod": "^3.22.4"
@@ -34,3 +36,4 @@
     "typescript": "^5.3.3"
   }
 }
+
