@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   S3Client,
   PutObjectCommand,
@@ -7,8 +7,10 @@ import {
   CopyObjectCommand,
   ListObjectsV2Command,
   DeleteObjectCommand,
+  NoSuchKey,
 } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
+import { getMimeType } from '@br/shared';
 
 @Injectable()
 export class StorageService {
@@ -215,6 +217,37 @@ export class StorageService {
 
   getDeployIndexPath(deployId: string): string {
     return `deploys/${deployId}/index.json`;
+  }
+
+  /**
+   * Get a file's stream and content type for a given deployment.
+   * Throws NotFoundException if the object does not exist.
+   */
+  async getFileStream(
+    deploymentId: string,
+    filePath: string,
+  ): Promise<{ stream: Readable; contentType: string }> {
+    const key = this.getDeployPath(deploymentId, filePath);
+
+    try {
+      const command = new GetObjectCommand({ Bucket: this.bucket, Key: key });
+      const result = await this.client.send(command);
+
+      if (!result.Body || !(result.Body instanceof Readable)) {
+        throw new Error(`S3 returned an invalid body for key: ${key}`);
+      }
+
+      const stream = result.Body;
+      const contentType = result.ContentType || getMimeType(filePath);
+
+      return { stream, contentType };
+    } catch (error) {
+      if (error instanceof NoSuchKey) {
+        throw new NotFoundException('Deployment or file not found');
+      }
+      this.logger.error(`Error getting object ${key}: ${error}`);
+      throw error;
+    }
   }
 }
 
